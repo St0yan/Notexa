@@ -17,16 +17,24 @@ class IdeaItemAdapter extends TypeAdapter<IdeaItem> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return IdeaItem(
-      text: fields[0] as String,
+      id: fields[0] as String,
+      createdAt: fields[2] as DateTime,
+      text: fields[3] as String,
     );
   }
 
   @override
   void write(BinaryWriter writer, IdeaItem obj) {
     writer
-      ..writeByte(1)
+      ..writeByte(4)
+      ..writeByte(3)
+      ..write(obj.text)
       ..writeByte(0)
-      ..write(obj.text);
+      ..write(obj.id)
+      ..writeByte(1)
+      ..write(obj.type)
+      ..writeByte(2)
+      ..write(obj.createdAt);
   }
 
   @override

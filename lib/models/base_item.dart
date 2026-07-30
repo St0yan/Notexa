@@ -16,9 +16,13 @@ enum ItemType {
   goal,
 }
 
-abstract class BaseItem {
+@HiveType(typeId: 100)
+class BaseItem {
+  @HiveField(0)
   final String id;
+  @HiveField(1)
   final ItemType type;
+  @HiveField(2)
   final DateTime createdAt;
 
   BaseItem({

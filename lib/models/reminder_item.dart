@@ -5,9 +5,9 @@ part 'reminder_item.g.dart';
 
 @HiveType(typeId: 5)
 class ReminderItem extends BaseItem {
-  @HiveField(0)
+  @HiveField(3)
   final String text;
-  @HiveField(1)
+  @HiveField(4)
   final DateTime alarmTime;
 
   ReminderItem({

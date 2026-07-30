@@ -25,9 +25,11 @@ void main() async {
   await Hive.openBox<BaseItem>('items');
 
   await Supabase.initialize(
-    url: "https://sbugqqhhfjzrbjmjtczc.supabase.co/rest/v1/",
-    anonKey: "sb_publishable_Yye4EaY186Tzm2ju4UDWLg_0Ytt0Jdf"
+    url: 'https://sbugqqhhfjzrbjmjtczc.supabase.co',
+    publishableKey: 'sb_publishable_Yye4EaY186Tzm2ju4UDWLg_0Ytt0Jdf',
   );
+
+  await Supabase.instance.client.auth.signInAnonymously();
 
   runApp(const Notexa());
 }

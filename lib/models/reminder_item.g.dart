@@ -17,19 +17,27 @@ class ReminderItemAdapter extends TypeAdapter<ReminderItem> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return ReminderItem(
-      text: fields[0] as String,
-      alarmTime: fields[1] as DateTime,
+      id: fields[0] as String,
+      createdAt: fields[2] as DateTime,
+      text: fields[3] as String,
+      alarmTime: fields[4] as DateTime,
     );
   }
 
   @override
   void write(BinaryWriter writer, ReminderItem obj) {
     writer
-      ..writeByte(2)
-      ..writeByte(0)
+      ..writeByte(5)
+      ..writeByte(3)
       ..write(obj.text)
+      ..writeByte(4)
+      ..write(obj.alarmTime)
+      ..writeByte(0)
+      ..write(obj.id)
       ..writeByte(1)
-      ..write(obj.alarmTime);
+      ..write(obj.type)
+      ..writeByte(2)
+      ..write(obj.createdAt);
   }
 
   @override

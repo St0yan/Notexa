@@ -23,18 +23,19 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final supabaseService = SupabaseService();
-  final box = Hive.box<BaseItem>('items');
   final List<BaseItem> items = [];
+  late Box<BaseItem> box;
 
+  @override
   void initState() {
     super.initState();
-
+    box = Hive.box<BaseItem>('items');
     items.addAll(box.values);
 
     _loadFromSupabase();
   }
 
-  Future _loadFromSupabase() async {
+  Future<void> _loadFromSupabase() async {
     final data = await Supabase.instance.client
         .from('items')
         .select();
@@ -174,7 +175,7 @@ class _HomePageState extends State<HomePage> {
                   Text(entry.text),
                 ],
               );
-            }),
+            }).toList(),
           ],
         );
 

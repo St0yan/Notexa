@@ -5,9 +5,9 @@ part 'goal_item.g.dart';
 
 @HiveType(typeId: 6)
 class GoalItem extends BaseItem {
-  @HiveField(0)
+  @HiveField(3)
   final String title;
-  @HiveField(1)
+  @HiveField(4)
   final String text;
 
   GoalItem({

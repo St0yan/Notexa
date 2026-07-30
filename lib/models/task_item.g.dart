@@ -17,8 +17,8 @@ class TaskEntryAdapter extends TypeAdapter<TaskEntry> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return TaskEntry(
-      text: fields[0] as String,
-      isDone: fields[1] as bool,
+      text: fields[3] as String,
+      isDone: fields[4] as bool,
     );
   }
 
@@ -26,9 +26,9 @@ class TaskEntryAdapter extends TypeAdapter<TaskEntry> {
   void write(BinaryWriter writer, TaskEntry obj) {
     writer
       ..writeByte(2)
-      ..writeByte(0)
+      ..writeByte(3)
       ..write(obj.text)
-      ..writeByte(1)
+      ..writeByte(4)
       ..write(obj.isDone);
   }
 
@@ -54,19 +54,27 @@ class TaskItemAdapter extends TypeAdapter<TaskItem> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return TaskItem(
-      title: fields[0] as String,
-      entries: (fields[1] as List).cast<TaskEntry>(),
+      id: fields[0] as String,
+      createdAt: fields[2] as DateTime,
+      title: fields[3] as String,
+      entries: (fields[4] as List).cast<TaskEntry>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, TaskItem obj) {
     writer
-      ..writeByte(2)
-      ..writeByte(0)
+      ..writeByte(5)
+      ..writeByte(3)
       ..write(obj.title)
+      ..writeByte(4)
+      ..write(obj.entries)
+      ..writeByte(0)
+      ..write(obj.id)
       ..writeByte(1)
-      ..write(obj.entries);
+      ..write(obj.type)
+      ..writeByte(2)
+      ..write(obj.createdAt);
   }
 
   @override

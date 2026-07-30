@@ -5,9 +5,9 @@ part 'task_item.g.dart';
 
 @HiveType(typeId: 2)
 class TaskEntry {
-  @HiveField(0)
+  @HiveField(3)
   String text;
-  @HiveField(1)
+  @HiveField(4)
   bool isDone;
 
   TaskEntry({
@@ -18,9 +18,9 @@ class TaskEntry {
 
 @HiveType(typeId: 3)
 class TaskItem extends BaseItem {
-  @HiveField(0)
+  @HiveField(3)
   final String title;
-  @HiveField(1)
+  @HiveField(4)
   final List<TaskEntry> entries;
 
   TaskItem({

@@ -5,7 +5,7 @@ part 'idea_item.g.dart';
 
 @HiveType(typeId: 4)
 class IdeaItem extends BaseItem {
-  @HiveField(0)
+  @HiveField(3)
   final String text;
 
   IdeaItem({

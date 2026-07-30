@@ -17,19 +17,27 @@ class GoalItemAdapter extends TypeAdapter<GoalItem> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return GoalItem(
-      title: fields[0] as String,
-      text: fields[1] as String,
+      id: fields[0] as String,
+      createdAt: fields[2] as DateTime,
+      title: fields[3] as String,
+      text: fields[4] as String,
     );
   }
 
   @override
   void write(BinaryWriter writer, GoalItem obj) {
     writer
-      ..writeByte(2)
-      ..writeByte(0)
+      ..writeByte(5)
+      ..writeByte(3)
       ..write(obj.title)
+      ..writeByte(4)
+      ..write(obj.text)
+      ..writeByte(0)
+      ..write(obj.id)
       ..writeByte(1)
-      ..write(obj.text);
+      ..write(obj.type)
+      ..writeByte(2)
+      ..write(obj.createdAt);
   }
 
   @override
