@@ -29,7 +29,10 @@ void main() async {
     publishableKey: 'sb_publishable_Yye4EaY186Tzm2ju4UDWLg_0Ytt0Jdf',
   );
 
-  await Supabase.instance.client.auth.signInAnonymously();
+  await Supabase.instance.client.auth.signInWithPassword(
+    email: 'test@notexa.app',
+    password: '12345678',
+  );
 
   runApp(const Notexa());
 }
