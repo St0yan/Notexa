@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '/services/supabase_service.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '/models/base_item.dart';
 import '/models/note_item.dart';
 import '/models/task_item.dart';
@@ -19,7 +22,33 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  final supabaseService = SupabaseService();
+  final box = Hive.box<BaseItem>('items');
   final List<BaseItem> items = [];
+
+  void initState() {
+    super.initState();
+
+    items.addAll(box.values);
+
+    _loadFromSupabase();
+  }
+
+  Future _loadFromSupabase() async {
+    final data = await Supabase.instance.client
+        .from('items')
+        .select();
+    
+    for (final row in data) {
+      final item = supabaseService.decodeItem(row);
+      if (!items.any((i) => i.id == item.id)) {
+        items.add(item);
+        box.add(item);
+      }
+    }
+
+    setState(() {});
+  }
 
   void _openAddMenu() {
     showModalBottomSheet(
@@ -55,7 +84,10 @@ class _HomePageState extends State<HomePage> {
         );
         if (result != null) {
           setState(() {
-            items.add(_createItem(type, result));
+            final item = _createItem(type, result);
+            items.add(item);
+            box.add(item);
+            supabaseService.uploadItem(item);
           });
         }
       },
@@ -142,7 +174,7 @@ class _HomePageState extends State<HomePage> {
                   Text(entry.text),
                 ],
               );
-            }).toList(),
+            }),
           ],
         );
 
