@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../models/goal_item.dart';
 
 class AddGoalPage extends StatefulWidget {
-  const AddGoalPage({super.key});
+  final GoalItem? editItem;
+  const AddGoalPage({this.editItem, super.key});
 
   @override
   State<AddGoalPage> createState() => _AddGoalPageState();
@@ -10,6 +12,16 @@ class AddGoalPage extends StatefulWidget {
 class _AddGoalPageState extends State<AddGoalPage> {
   final TextEditingController _titleCtrl = TextEditingController();
   final TextEditingController _textCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+
+    if (widget.editItem != null) {
+      _titleCtrl.text = widget.editItem!.title;
+      _textCtrl.text = widget.editItem!.text;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,10 +38,14 @@ class _AddGoalPageState extends State<AddGoalPage> {
           IconButton(
             icon: const Icon(Icons.check),
             onPressed: () {
-              Navigator.pop(context, {
-                'title': _titleCtrl.text,
-                'text': _textCtrl.text,
-              });
+              final goal = GoalItem(
+                id: widget.editItem?.id ?? UniqueKey().toString(),
+                createdAt: widget.editItem?.createdAt ?? DateTime.now(),
+                title: _titleCtrl.text,
+                text: _textCtrl.text,
+              );
+
+              Navigator.pop(context, goal);
             },
           ),
         ],

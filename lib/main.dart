@@ -3,26 +3,24 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '/pages/home_page.dart';
 import '/models/base_item.dart';
-import '/models/goal_item.dart';
-import '/models/idea_item.dart';
-import '/models/note_item.dart';
-import '/models/reminder_item.dart';
-import '/models/task_item.dart';
+import '/models/deleted_item_marker.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Hive.initFlutter();
 
-  Hive.registerAdapter(NoteItemAdapter());
-  Hive.registerAdapter(TaskItemAdapter());
-  Hive.registerAdapter(TaskEntryAdapter());
-  Hive.registerAdapter(IdeaItemAdapter());
-  Hive.registerAdapter(ReminderItemAdapter());
-  Hive.registerAdapter(GoalItemAdapter());
+  //Hive.registerAdapter(NoteItemAdapter());
+  //Hive.registerAdapter(TaskItemAdapter());
+  //Hive.registerAdapter(TaskEntryAdapter());
+  //Hive.registerAdapter(IdeaItemAdapter());
+  //Hive.registerAdapter(ReminderItemAdapter());
+  //Hive.registerAdapter(GoalItemAdapter());
   Hive.registerAdapter(ItemTypeAdapter());
+  Hive.registerAdapter(DeletedItemMarkerAdapter());
 
-  await Hive.openBox<BaseItem>('items');
+  //await Hive.deleteBoxFromDisk('items');
+  await Hive.openBox<String>('items');
 
   await Supabase.initialize(
     url: 'https://sbugqqhhfjzrbjmjtczc.supabase.co',

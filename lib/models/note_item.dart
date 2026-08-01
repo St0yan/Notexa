@@ -16,4 +16,15 @@ class NoteItem extends BaseItem {
     required this.title,
     required this.text,
   }) : super(type: ItemType.note);
+
+  @override
+  Map<String, dynamic> toDataJson() {
+    return {
+      'id': id,
+      'title': title,
+      'text': text,
+      'created_at': createdAt.toIso8601String(),
+      'type': type.name,
+    };
+  }
 }

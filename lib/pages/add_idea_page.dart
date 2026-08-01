@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import '../models/idea_item.dart';
 
 class AddIdeaPage extends StatefulWidget {
-  const AddIdeaPage({super.key});
+  final IdeaItem? editItem;
+
+  const AddIdeaPage({this.editItem, super.key});
 
   @override
   State<AddIdeaPage> createState() => _AddIdeaPageState();
@@ -9,6 +12,15 @@ class AddIdeaPage extends StatefulWidget {
 
 class _AddIdeaPageState extends State<AddIdeaPage> {
   final TextEditingController _textCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+
+    if (widget.editItem != null) {
+      _textCtrl.text = widget.editItem!.text;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,9 +37,13 @@ class _AddIdeaPageState extends State<AddIdeaPage> {
           IconButton(
             icon: const Icon(Icons.check),
             onPressed: () {
-              Navigator.pop(context, {
-                'text': _textCtrl.text,
-              });
+              final idea = IdeaItem(
+                id: widget.editItem?.id ?? UniqueKey().toString(),
+                createdAt: widget.editItem?.createdAt ?? DateTime.now(),
+                text: _textCtrl.text,
+              );
+
+              Navigator.pop(context, idea);
             },
           ),
         ],

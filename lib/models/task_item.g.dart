@@ -17,8 +17,8 @@ class TaskEntryAdapter extends TypeAdapter<TaskEntry> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return TaskEntry(
-      text: fields[3] as String,
-      isDone: fields[4] as bool,
+      text: fields[0] as String,
+      isDone: fields[1] as bool,
     );
   }
 
@@ -26,9 +26,9 @@ class TaskEntryAdapter extends TypeAdapter<TaskEntry> {
   void write(BinaryWriter writer, TaskEntry obj) {
     writer
       ..writeByte(2)
-      ..writeByte(3)
+      ..writeByte(0)
       ..write(obj.text)
-      ..writeByte(4)
+      ..writeByte(1)
       ..write(obj.isDone);
   }
 

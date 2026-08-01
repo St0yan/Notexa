@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/base_item.dart';
 import '../models/note_item.dart';
@@ -10,105 +11,142 @@ class SupabaseService {
   final supabase = Supabase.instance.client;
 
   Future<void> uploadItem(BaseItem item) async {
-    await supabase.from('items').insert({
-      'id': item.id,
-      'type': item.type.name,
-      'created_at': item.createdAt.toIso8601String(),
-      'data': _encodeItem(item),
-    });
+    await supabase.from('items').insert(item.toJson());
   }
 
-  Map<String, dynamic> _encodeItem(BaseItem item) {
-    switch (item.type) {
-      case ItemType.note:
-        final n = item as NoteItem;
-        return {
-          'title': n.title,
-          'text': n.text,
-        };
+  // --- ДЕКОДИРАНЕ НА DATA ---
+  Map<String, dynamic> decodeData(dynamic raw) {
+    if (raw == null) return {};
 
-      case ItemType.task:
-        final t = item as TaskItem;
-        return {
-          'title': t.title,
-          'entries': t.entries
-              .map((e) => {'text': e.text, 'isDone': e.isDone})
-              .toList(),
-        };
+    // Ако е Map → директно
+    if (raw is Map) return Map<String, dynamic>.from(raw);
 
-      case ItemType.idea:
-        final i = item as IdeaItem;
-        return {'text': i.text};
+    // Ако е String → опитваме да декодираме
+    if (raw is String) {
+      try {
+        dynamic decoded = jsonDecode(raw);
 
-      case ItemType.reminder:
-        final r = item as ReminderItem;
-        return {
-          'text': r.text,
-          'alarm': r.alarmTime.toIso8601String(),
-        };
+        // Ако е Map → готово
+        if (decoded is Map) {
+          return Map<String, dynamic>.from(decoded);
+        }
 
-      case ItemType.goal:
-        final g = item as GoalItem;
-        return {
-          'title': g.title,
-          'text': g.text,
-        };
+        // Ако е String → опитваме втори път
+        if (decoded is String) {
+          decoded = jsonDecode(decoded);
+          if (decoded is Map) {
+            return Map<String, dynamic>.from(decoded);
+          }
+        }
+      } catch (_) {}
     }
+
+    return {};
   }
 
-  BaseItem decodeItem(Map<String, dynamic> row) {
-    final id = row['id'];
-    final type = row['type'];
-    final createdAt = DateTime.parse(row['created_at']);
-    final data = row['data'] as Map<String, dynamic>;
+  BaseItem decodeItem(Map<dynamic, dynamic> json) {
+    final type = ItemType.values.firstWhere((t) => t.name == json['type']);
+    final id = json['id'] ?? "";
+    final createdAt = DateTime.tryParse(json['created_at'] ?? "") ?? DateTime.now();
+
+    Map<String, dynamic> normalize(Map<dynamic, dynamic> input) {
+      return input.map((key, value) {
+        if (value is Map) {
+          return MapEntry(key.toString(), normalize(value));
+        }
+        return MapEntry(key.toString(), value);
+      });
+    }
+
+    Map<String, dynamic> data = {};
+
+    if (json['data'] != null) {
+      if (json['data'] is String) {
+        data = decodeData(json['data']);   // <-- поправено
+      } else if (json['data'] is Map<String, dynamic>) {
+        data = Map<String, dynamic>.from(json['data']);
+      }
+    } else {
+      data = normalize(json);
+    }
 
     switch (type) {
-      case 'note':
+      case ItemType.note:
         return NoteItem(
           id: id,
           createdAt: createdAt,
-          title: data['title'],
-          text: data['text'],
+          title: data['title'] ?? "",
+          text: data['text'] ?? "",
         );
 
-      case 'task':
+      case ItemType.task:
+        dynamic rawEntries = data['entries'];
+
+        if (rawEntries is String) {
+          rawEntries = jsonDecode(rawEntries);
+        }
+        if (rawEntries == null) rawEntries = [];
+
+        final entriesJson = rawEntries as List? ?? [];
+
+        final entries = entriesJson.map((e) {
+          return TaskEntry(
+            text: e['text'] ?? "",
+            isDone: e['isDone'] ?? false,
+          );
+        }).toList();
+
         return TaskItem(
           id: id,
           createdAt: createdAt,
-          title: data['title'],
-          entries: (data['entries'] as List)
-              .map((e) => TaskEntry(
-                    text: e['text'],
-                    isDone: e['isDone'],
-                  ))
-              .toList(),
+          title: data['title'] ?? "",
+          entries: entries,
         );
 
-      case 'idea':
+      case ItemType.idea:
         return IdeaItem(
           id: id,
           createdAt: createdAt,
-          text: data['text'],
+          text: data['text'] ?? "",
         );
 
-      case 'reminder':
+      case ItemType.reminder:
         return ReminderItem(
           id: id,
           createdAt: createdAt,
-          text: data['text'],
-          alarmTime: DateTime.parse(data['alarm']),
+          text: data['text'] ?? "",
+          alarmTime: DateTime.tryParse(data['alarm'] ?? "") ?? DateTime.now(),
         );
 
-      case 'goal':
+      case ItemType.goal:
         return GoalItem(
           id: id,
           createdAt: createdAt,
-          title: data['title'],
-          text: data['text'],
+          title: data['title'] ?? "",
+          text: data['text'] ?? "",
         );
+    }
+  }
 
-      default:
-        throw Exception("Unknown item type: $type");
+  Future<void> updateItem(BaseItem item) async {
+    await supabase.from('items').update(item.toJson()).eq('id', item.id);
+  }
+
+  Future<void> deleteItem(String id) async {
+    await supabase.from('items').delete().eq('id', id);
+  }
+
+  Future<void> uploadOrUpdateItem(BaseItem item) async {
+    final existing = await supabase
+        .from('items')
+        .select()
+        .eq('id', item.id)
+        .maybeSingle();
+
+    if (existing == null) {
+      await supabase.from('items').insert(item.toJson());
+    } else {
+      await supabase.from('items').update(item.toJson()).eq('id', item.id);
     }
   }
 }

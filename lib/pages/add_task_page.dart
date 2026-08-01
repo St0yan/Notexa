@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:notexa/models/task_item.dart';
+import '../models/task_item.dart';
 
 class AddTaskPage extends StatefulWidget {
-  const AddTaskPage({super.key});
+  final TaskItem? editItem;
+
+  const AddTaskPage({this.editItem, super.key});
 
   @override
   State<AddTaskPage> createState() => _AddTaskPageState();
@@ -12,6 +14,23 @@ class _AddTaskPageState extends State<AddTaskPage> {
   final TextEditingController _titleCtrl = TextEditingController();
   final List<TaskEntry> entries = [];
   final TextEditingController _entryCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Ако редактираме → попълваме заглавието
+    if (widget.editItem != null) {
+      _titleCtrl.text = widget.editItem!.title;
+
+      // Копираме entries, за да не променяме оригинала
+      entries.addAll(
+        widget.editItem!.entries.map(
+          (e) => TaskEntry(text: e.text, isDone: e.isDone),
+        ),
+      );
+    }
+  }
 
   void _addEntry() {
     if (_entryCtrl.text.trim().isEmpty) return;
@@ -37,11 +56,15 @@ class _AddTaskPageState extends State<AddTaskPage> {
           IconButton(
             icon: const Icon(Icons.check),
             onPressed: () {
-              Navigator.pop(context, {
-                'title': _titleCtrl.text,
-                'entries': entries,
-              });
-            },
+              final task = TaskItem(
+                id: widget.editItem?.id ?? UniqueKey().toString(),
+                createdAt: widget.editItem?.createdAt ?? DateTime.now(),
+                title: _titleCtrl.text,
+                entries: entries,
+              );
+
+              Navigator.pop(context, task);
+            }
           ),
         ],
       ),

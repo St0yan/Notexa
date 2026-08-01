@@ -16,4 +16,15 @@ class ReminderItem extends BaseItem {
     required this.text,
     required this.alarmTime,
   }) : super(type: ItemType.reminder);
+
+  @override
+  Map<String, dynamic> toDataJson() {
+    return {
+      'id': id,
+      'text': text,
+      'alarm_time': alarmTime,
+      'created_at': createdAt.toIso8601String(),
+      'type': type.name,
+    };
+  }
 }

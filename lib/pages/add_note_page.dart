@@ -1,65 +1,50 @@
 import 'package:flutter/material.dart';
+import '../models/note_item.dart';
 
 class AddNotePage extends StatefulWidget {
-  const AddNotePage({super.key});
+  final NoteItem? editItem;
+
+  const AddNotePage({this.editItem, super.key});
 
   @override
   State<AddNotePage> createState() => _AddNotePageState();
 }
 
 class _AddNotePageState extends State<AddNotePage> {
-  final TextEditingController _titleCtrl = TextEditingController();
-  final TextEditingController _textCtrl = TextEditingController();
+  late TextEditingController titleController;
+  late TextEditingController textController;
+
+  @override
+  void initState() {
+    super.initState();
+
+    titleController = TextEditingController(text: widget.editItem?.title ?? "");
+    textController = TextEditingController(text: widget.editItem?.text ?? "");
+  }
+
+  void _save() {
+    final idea = NoteItem(
+      id: UniqueKey().toString(),
+      createdAt: DateTime.now(),
+      title: titleController.text,
+      text: textController.text
+    );
+
+    Navigator.pop(context, idea);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.check),
-            onPressed: () {
-              Navigator.pop(context, {
-                'title': _titleCtrl.text,
-                'text': _textCtrl.text,
-              });
-            },
-          ),
-        ],
+        title: Text(widget.editItem == null ? "Нова бележка" : "Редакция"),
       ),
-
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            TextField(
-              controller: _titleCtrl,
-              autofocus: true,
-              decoration: const InputDecoration(
-                hintText: "Заглавие...",
-                border: InputBorder.none,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: TextField(
-                controller: _textCtrl,
-                maxLines: null,
-                decoration: const InputDecoration(
-                  hintText: "Текст на бележката...",
-                  border: InputBorder.none,
-                ),
-              ),
-            ),
-          ],
-        ),
+      body: Column(
+        children: [
+          TextField(controller: titleController, decoration: InputDecoration(hintText: 'Заглавие'),),
+          TextField(controller: textController, decoration: InputDecoration(hintText: 'Бележка'), maxLines: null,),
+          ElevatedButton(onPressed: _save, child: Text("Запази")),
+        ],
       ),
     );
   }

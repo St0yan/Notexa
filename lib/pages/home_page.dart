@@ -1,18 +1,10 @@
 import 'package:flutter/material.dart';
-import '/services/supabase_service.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import '/models/base_item.dart';
-import '/models/note_item.dart';
-import '/models/task_item.dart';
-import '/models/idea_item.dart';
-import '/models/reminder_item.dart';
-import '/models/goal_item.dart';
-import 'add_goal_page.dart';
-import 'add_idea_page.dart';
-import 'add_note_page.dart';
-import 'add_reminder_page.dart';
-import 'add_task_page.dart';
+import 'package:notexa/services/supabase_service.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'home_controller.dart';
+import '../models/base_item.dart';
+import '../widgets/item_grid_card.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -22,197 +14,95 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  late final HomeController controller;
   final supabaseService = SupabaseService();
   final List<BaseItem> items = [];
-  late Box<BaseItem> box;
+  late Box<String> box;
 
   @override
   void initState() {
     super.initState();
-    box = Hive.box<BaseItem>('items');
-    items.addAll(box.values);
-
-    _loadFromSupabase();
+    controller = HomeController(onUpdate: () => setState(() {}));
+    controller.init();
   }
 
-  Future<void> _loadFromSupabase() async {
-    final data = await Supabase.instance.client
-        .from('items')
-        .select();
-    
-    for (final row in data) {
-      final item = supabaseService.decodeItem(row);
-      if (!items.any((i) => i.id == item.id)) {
-        items.add(item);
-        box.add(item);
-      }
-    }
-
-    setState(() {});
-  }
-
-  void _openAddMenu() {
+  void _showTypeMenu(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (context) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildOption("Бележка", AddNotePage(), ItemType.note),
-            _buildOption("Задача", AddTaskPage(), ItemType.task),
-            _buildOption("Идея", AddIdeaPage(), ItemType.idea),
-            _buildOption("Напомняне", AddReminderPage(), ItemType.reminder),
-            _buildOption("Цел", AddGoalPage(), ItemType.goal),
-          ],
+      builder: (_) {
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _typeButton(
+                context,
+                icon: Icons.note_alt,
+                color: Colors.yellow.shade600,
+                text: "Бележка",
+                type: ItemType.note,
+              ),
+              _typeButton(
+                context,
+                icon: Icons.checklist,
+                color: Colors.blue.shade600,
+                text: "Задача",
+                type: ItemType.task,
+              ),
+              _typeButton(
+                context,
+                icon: Icons.lightbulb,
+                color: Colors.orange.shade600,
+                text: "Идея",
+                type: ItemType.idea,
+              ),
+              _typeButton(
+                context,
+                icon: Icons.alarm,
+                color: Colors.red.shade600,
+                text: "Напомняне",
+                type: ItemType.reminder,
+              ),
+              _typeButton(
+                context,
+                icon: Icons.flag,
+                color: Colors.green.shade600,
+                text: "Цел",
+                type: ItemType.goal,
+              ),
+            ],
+          ),
         );
       },
     );
   }
 
-  Widget _buildOption(String label, Widget page, ItemType type) {
+  Widget _typeButton(
+    BuildContext context, {
+    required IconData icon,
+    required Color color,
+    required String text,
+    required ItemType type,
+  }) {
     return ListTile(
-      title: Text(label, style: const TextStyle(fontSize: 18)),
-      onTap: () async {
+      leading: Icon(icon, color: color, size: 28),
+      title: Text(
+        text,
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+      ),
+      onTap: () {
         Navigator.pop(context);
-
-        final result = await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => page),
-        );
-        if (result != null) {
-          setState(() {
-            final item = _createItem(type, result);
-            items.add(item);
-            box.add(item);
-            supabaseService.uploadItem(item);
-          });
-        }
+        controller.createNewItem(context, type);
       },
     );
-  }
-
-  BaseItem _createItem(ItemType type, dynamic data) {
-    final id = UniqueKey().toString();
-    final now = DateTime.now();
-
-    switch (type) {
-      case ItemType.note:
-        return NoteItem(
-          id: id,
-          createdAt: now,
-          title: data['title'],
-          text: data['text'],
-        );
-
-      case ItemType.task:
-        return TaskItem(
-          id: id,
-          createdAt: now,
-          title: data['title'],
-          entries: data['entries'],
-        );
-
-      case ItemType.idea:
-        return IdeaItem(
-          id: id,
-          createdAt: now,
-          text: data['text'],
-        );
-
-      case ItemType.reminder:
-        return ReminderItem(
-          id: id,
-          createdAt: now,
-          text: data['text'],
-          alarmTime: data['alarm'],
-        );
-
-      case ItemType.goal:
-        return GoalItem(
-          id: id,
-          createdAt: now,
-          title: data['title'],
-          text: data['text'],
-        );
-    }
-  }
-
-  Widget buildItemCard(BaseItem item) {
-    switch (item.type) {
-      case ItemType.note:
-        final n = item as NoteItem;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(n.title,
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            Text(n.text, style: const TextStyle(fontSize: 16)),
-          ],
-        );
-
-      case ItemType.task:
-        final t = item as TaskItem;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(t.title,
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            ...t.entries.map((entry) {
-              return Row(
-                children: [
-                  Checkbox(
-                    value: entry.isDone,
-                    onChanged: (_) {},
-                  ),
-                  Text(entry.text),
-                ],
-              );
-            }).toList(),
-          ],
-        );
-
-      case ItemType.idea:
-        final i = item as IdeaItem;
-        return Text(i.text, style: const TextStyle(fontSize: 18));
-
-      case ItemType.reminder:
-        final r = item as ReminderItem;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(r.text, style: const TextStyle(fontSize: 18)),
-            Text("⏰ ${r.alarmTime}",
-                style: const TextStyle(color: Colors.grey)),
-          ],
-        );
-
-      case ItemType.goal:
-        final g = item as GoalItem;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(g.title,
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            Text(g.text, style: const TextStyle(fontSize: 16)),
-          ],
-        );
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -226,23 +116,37 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.more_vert, size: 26),
             onPressed: () {},
           ),
+          controller.isSyncing
+              ? const Padding(
+                  padding: EdgeInsets.only(right: 16),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : const Icon(Icons.check_circle, color: Colors.green),
         ],
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        itemCount: items.length,
+      body: MasonryGridView.count(
+        crossAxisCount: 3,
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 8,
+        padding: const EdgeInsets.all(8),
+        itemCount: controller.items.length,
         itemBuilder: (context, index) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: buildItemCard(items[index]),
+          final item = controller.items[index];
+          return ItemGridCard(
+            item: item,
+            onTap: () => controller.openItem(context, item),
+            onDelete: () => controller.deleteItem(item),
           );
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _openAddMenu,
-        backgroundColor: Colors.blue,
-        child: const Icon(Icons.add, color: Colors.white),
-      )
+        onPressed: () => _showTypeMenu(context),
+        child: const Icon(Icons.add),
+      ),
     );
   }
 }

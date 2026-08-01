@@ -13,4 +13,14 @@ class IdeaItem extends BaseItem {
     required super.createdAt,
     required this.text,
   }) : super(type: ItemType.idea);
+
+  @override
+  Map<String, dynamic> toDataJson() {
+    return {
+      'id': id,
+      'text': text,
+      'created_at': createdAt.toIso8601String(),
+      'type': type.name,
+    };
+  }
 }

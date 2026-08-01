@@ -30,4 +30,17 @@ class BaseItem {
     required this.type,
     required this.createdAt,
   });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'type': type.name,
+      'created_at': createdAt.toIso8601String(),
+      'data': toDataJson(),
+    };
+  }
+
+  Map<String, dynamic> toDataJson() {
+    return {};
+  }
 }
