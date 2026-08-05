@@ -62,6 +62,17 @@ class _AddReminderPageState extends State<AddReminderPage> {
     );
 
     Navigator.pop(context, reminder);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Напомнянето е запазено!'),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+        ),
+        margin: EdgeInsets.all(12),
+      ),
+    );
   }
 
   @override
@@ -89,6 +100,7 @@ class _AddReminderPageState extends State<AddReminderPage> {
           children: [
             TextField(
               controller: _textCtrl,
+              textCapitalization: TextCapitalization.sentences,
               autofocus: true,
               maxLines: null,
               decoration: const InputDecoration(

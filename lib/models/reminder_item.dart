@@ -22,7 +22,7 @@ class ReminderItem extends BaseItem {
     return {
       'id': id,
       'text': text,
-      'alarm_time': alarmTime,
+      'alarm_time': alarmTime.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
       'type': type.name,
     };

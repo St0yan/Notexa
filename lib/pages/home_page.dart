@@ -139,7 +139,21 @@ class _HomePageState extends State<HomePage> {
           return ItemGridCard(
             item: item,
             onTap: () => controller.openItem(context, item),
-            onDelete: () => controller.deleteItem(item),
+            onDelete: () {
+              controller.deleteItem(item);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Елементът е изтрит!'),
+                  backgroundColor: Colors.red,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                  ),
+                  margin: EdgeInsets.all(12),
+                ),
+              );
+            },
+            onEdit: () => controller.openItem(context, item),
           );
         },
       ),

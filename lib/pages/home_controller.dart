@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:io';
 import '../services/supabase_service.dart';
 import '../models/base_item.dart';
 import '../models/note_item.dart';
@@ -31,15 +33,14 @@ class HomeController {
   late Box<String> box;
 
   Future<void> init() async {
-    await ensureHiveIsValid();   // <-- добавяме това
+    await ensureHiveIsValid();
+
+    
 
     box = await Hive.openBox<String>('items');
 
-    final all = box.values.toList();
-
     items.clear();
-
-    for (final jsonString in all) {
+    for (final jsonString in box.values) {
       try {
         final json = jsonDecode(jsonString);
         final item = supabaseService.decodeItem(json);
@@ -47,9 +48,38 @@ class HomeController {
       } catch (_) {}
     }
 
-    _loadFromSupabase();
+    onUpdate(); // показва UI веднага
+
+    // 🔥 2) Проверяваме интернет
+    final hasInternet = await _checkInternet();
+    if (!hasInternet) {
+      // ❗ Няма интернет → работим офлайн
+      return;
+    }
+
+    // 🔥 5) Зареждаме от Supabase (само ако има интернет)
+    await _loadFromSupabase();
+
+    // 🔥 6) Realtime (само ако има интернет)
     _supabaseRealtime();
+
+    // 🔥 7) Синхронизация на offlineQueue (само ако има интернет)
     _retrySync();
+  }
+
+  List<BaseItem> decodeHiveItems(List<String> values) {
+    final result = <BaseItem>[];
+    final service = SupabaseService();
+
+    for (final jsonString in values) {
+      try {
+        final json = jsonDecode(jsonString);
+        final item = service.decodeItem(json);
+        result.add(item);
+      } catch (_) {}
+    }
+
+    return result;
   }
 
   Future<void> ensureHiveIsValid() async {
@@ -58,12 +88,6 @@ class HomeController {
     bool invalidFound = false;
 
     for (final value in box.values) {
-      if (value is! String) {
-        invalidFound = true;
-        break;
-      }
-
-      // Проверка дали String е валиден JSON
       try {
         final decoded = jsonDecode(value);
         if (decoded is! Map) {
@@ -77,7 +101,6 @@ class HomeController {
     }
 
     if (invalidFound) {
-      print("⚠ Hive съдържа невалидни записи → изчиствам box-а...");
       await box.clear();
     }
   }
@@ -86,21 +109,31 @@ class HomeController {
     isSyncing = true;
     onUpdate();
 
-    final data = await Supabase.instance.client
-        .from('items')
-        .select();
+    try {
+      final data = await Supabase.instance.client
+          .from('items')
+          .select();
 
-    items.clear();
-    await box.clear();
+      // Успешно зареждане от Supabase
+      items.clear();
+      await box.clear();
 
-    for (final row in data) {
-      try {
-        final json = row;
-        final item = supabaseService.decodeItem(json);
+      for (final row in data) {
+        final item = supabaseService.decodeItem(row);
         items.add(item);
-        box.put(item.id, jsonEncode(json));
-      } catch (e) {
-        print("Decode error: $e");
+        box.put(item.id, jsonEncode(row));
+      }
+
+    } catch (e) {
+      // ❗ Няма интернет → зареждаме само Hive
+      items.clear();
+
+      for (final jsonString in box.values) {
+        try {
+          final json = jsonDecode(jsonString);
+          final item = supabaseService.decodeItem(json);
+          items.add(item);
+        } catch (_) {}
       }
     }
 
@@ -124,6 +157,9 @@ class HomeController {
   }
 
   Future<void> _retrySync() async {
+    final hasInternet = await _checkInternet();
+      if (!hasInternet) return;
+
     if (offlineQueue.isEmpty) return;
 
     isSyncing = true;
@@ -155,6 +191,15 @@ class HomeController {
     }
   }
 
+  Future<bool> _checkInternet() async {
+    try {
+      final result = await InternetAddress.lookup('google.com');
+      return result.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> uploadItem(BaseItem item) async {
     await Supabase.instance.client
         .from('items')
@@ -179,35 +224,55 @@ class HomeController {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => AddIdeaPage(editItem: item as IdeaItem)),
-        );
+        ).then((result) {
+          if (result != null && result is BaseItem) {
+            updateItem(result);
+          }
+        });
         break;
 
       case ItemType.reminder:
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => AddReminderPage(editItem: item as ReminderItem)),
-        );
+        ).then((result) {
+          if (result != null && result is BaseItem) {
+            updateItem(result);
+          }
+        });
         break;
 
       case ItemType.note:
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => AddNotePage(editItem: item as NoteItem)),
-        );
+        ).then((result) {
+          if (result != null && result is BaseItem) {
+            updateItem(result);
+          }
+        });
         break;
 
       case ItemType.task:
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => AddTaskPage(editItem: item as TaskItem)),
-        );
+        ).then((result) {
+          if (result != null && result is BaseItem) {
+            updateItem(result);
+          }
+        });
         break;
 
       case ItemType.goal:
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => AddGoalPage(editItem: item as GoalItem)),
-        );
+        ).then((result) {
+          if (result != null && result is BaseItem) {
+            updateItem(result);
+          }
+        });
         break;
     }
   }
@@ -276,11 +341,28 @@ class HomeController {
       final json = item.toJson();
 
       items.add(item);
-      box.put(item.id, jsonEncode(jsonEncode(item.toJson())));
+      box.put(item.id, jsonEncode(item.toJson()));
       await supabaseService.uploadItem(item);
       onUpdate();
     } catch (_) {
       offlineQueue.add(item);
+      _retrySync();
+    }
+  }
+
+  void updateItem(BaseItem updated) async {
+    try {
+      final index = items.indexWhere((i) => i.id == updated.id);
+      if (index != -1) {
+        items[index] = updated;
+      }
+
+      box.put(updated.id, jsonEncode(updated.toJson()));
+      await supabaseService.uploadOrUpdateItem(updated);
+
+      onUpdate();
+    } catch (_) {
+      offlineQueue.add(updated);
       _retrySync();
     }
   }

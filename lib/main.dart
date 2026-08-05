@@ -10,12 +10,6 @@ void main() async {
 
   await Hive.initFlutter();
 
-  //Hive.registerAdapter(NoteItemAdapter());
-  //Hive.registerAdapter(TaskItemAdapter());
-  //Hive.registerAdapter(TaskEntryAdapter());
-  //Hive.registerAdapter(IdeaItemAdapter());
-  //Hive.registerAdapter(ReminderItemAdapter());
-  //Hive.registerAdapter(GoalItemAdapter());
   Hive.registerAdapter(ItemTypeAdapter());
   Hive.registerAdapter(DeletedItemMarkerAdapter());
 
@@ -23,14 +17,13 @@ void main() async {
   await Hive.openBox<String>('items');
 
   await Supabase.initialize(
-    url: 'https://sbugqqhhfjzrbjmjtczc.supabase.co',
-    publishableKey: 'sb_publishable_Yye4EaY186Tzm2ju4UDWLg_0Ytt0Jdf',
-  );
-
+      url: 'https://sbugqqhhfjzrbjmjtczc.supabase.co',
+      publishableKey: 'sb_publishable_Yye4EaY186Tzm2ju4UDWLg_0Ytt0Jdf',
+    );
   await Supabase.instance.client.auth.signInWithPassword(
-    email: 'test@notexa.app',
-    password: '12345678',
-  );
+        email: "test@notexa.app",
+        password: "12345678",
+      );
 
   runApp(const Notexa());
 }

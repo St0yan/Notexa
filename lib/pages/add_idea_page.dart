@@ -44,6 +44,17 @@ class _AddIdeaPageState extends State<AddIdeaPage> {
               );
 
               Navigator.pop(context, idea);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Идеята е запазена!'),
+                  backgroundColor: Colors.green,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                  ),
+                  margin: EdgeInsets.all(12),
+                ),
+              );
             },
           ),
         ],
@@ -53,6 +64,7 @@ class _AddIdeaPageState extends State<AddIdeaPage> {
         padding: const EdgeInsets.all(16),
         child: TextField(
           controller: _textCtrl,
+          textCapitalization: TextCapitalization.sentences,
           autofocus: true,
           maxLines: null,
           decoration: const InputDecoration(

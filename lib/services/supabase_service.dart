@@ -85,7 +85,7 @@ class SupabaseService {
         if (rawEntries is String) {
           rawEntries = jsonDecode(rawEntries);
         }
-        if (rawEntries == null) rawEntries = [];
+        rawEntries ??= [];
 
         final entriesJson = rawEntries as List? ?? [];
 
@@ -115,7 +115,7 @@ class SupabaseService {
           id: id,
           createdAt: createdAt,
           text: data['text'] ?? "",
-          alarmTime: DateTime.tryParse(data['alarm'] ?? "") ?? DateTime.now(),
+          alarmTime: DateTime.tryParse(data['alarm_time'] ?? "") ?? DateTime.now(),
         );
 
       case ItemType.goal:

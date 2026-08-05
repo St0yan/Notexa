@@ -37,7 +37,13 @@ class ItemCard extends StatelessWidget {
         subtitle: getSubtitleForItem(item),
         onTap: onTap,
         trailing: IconButton(
-          icon: const Icon(Icons.delete),
+          icon: const Icon(
+            Icons.close,
+            color: Colors.red,
+            size: 20, // малка иконка
+          ),
+          padding: EdgeInsets.zero,          // премахва излишното пространство
+          constraints: const BoxConstraints(), // прави я компактна
           onPressed: onDelete,
         ),
       ),

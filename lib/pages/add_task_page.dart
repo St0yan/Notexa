@@ -64,6 +64,17 @@ class _AddTaskPageState extends State<AddTaskPage> {
               );
 
               Navigator.pop(context, task);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Задачата е запазена!'),
+                  backgroundColor: Colors.green,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                  ),
+                  margin: EdgeInsets.all(12),
+                ),
+              );
             }
           ),
         ],
@@ -75,6 +86,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
           children: [
             TextField(
               controller: _titleCtrl,
+              textCapitalization: TextCapitalization.sentences,
               decoration: const InputDecoration(
                 hintText: "Заглавие на задачата...",
                 border: InputBorder.none,
@@ -88,6 +100,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
                 Expanded(
                   child: TextField(
                     controller: _entryCtrl,
+                    textCapitalization: TextCapitalization.sentences,
                     decoration: const InputDecoration(
                       hintText: "Добави под‑задача...",
                       border: InputBorder.none,
@@ -107,12 +120,17 @@ class _AddTaskPageState extends State<AddTaskPage> {
               child: ListView.builder(
                 itemCount: entries.length,
                 itemBuilder: (context, index) {
-                  return Row(
-                    children: [
-                      const Icon(Icons.circle_outlined, size: 18),
-                      const SizedBox(width: 8),
-                      Text(entries[index].text),
-                    ],
+                  final entry = entries[index];
+
+                  return CheckboxListTile(
+                    value: entry.isDone,
+                    title: Text(entry.text),
+                    onChanged: (value) {
+                      setState(() {
+                        entry.isDone = value!;
+                        entries[index] = entry;
+                      });
+                    },
                   );
                 },
               ),

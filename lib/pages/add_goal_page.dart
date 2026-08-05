@@ -46,6 +46,17 @@ class _AddGoalPageState extends State<AddGoalPage> {
               );
 
               Navigator.pop(context, goal);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Целта е запазена!'),
+                  backgroundColor: Colors.green,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                  ),
+                  margin: EdgeInsets.all(12),
+                ),
+              );
             },
           ),
         ],
@@ -57,6 +68,7 @@ class _AddGoalPageState extends State<AddGoalPage> {
           children: [
             TextField(
               controller: _titleCtrl,
+              textCapitalization: TextCapitalization.sentences,
               decoration: const InputDecoration(
                 hintText: "Заглавие на целта...",
                 border: InputBorder.none,
@@ -66,6 +78,7 @@ class _AddGoalPageState extends State<AddGoalPage> {
             Expanded(
               child: TextField(
                 controller: _textCtrl,
+                textCapitalization: TextCapitalization.sentences,
                 maxLines: null,
                 decoration: const InputDecoration(
                   hintText: "Описание на целта...",
