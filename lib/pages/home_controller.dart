@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter/foundation.dart';
 import 'dart:io';
 import '../services/supabase_service.dart';
+import '../services/notification_service.dart';
 import '../models/base_item.dart';
 import '../models/note_item.dart';
 import '../models/task_item.dart';
@@ -18,12 +18,23 @@ import 'add_note_page.dart';
 import 'add_reminder_page.dart';
 import 'add_task_page.dart';
 
+enum SortMode {
+    dateAsc,
+    dateDesc
+  }
 
 class HomeController {
-  final Function onUpdate;
+
+  HomeController._private();
+
+  static final HomeController instance = HomeController._private();
+
+  late Function onUpdate;
   final supabaseService = SupabaseService();
 
   HomeController({required this.onUpdate});
+
+  SortMode sortMode = SortMode.dateAsc;
 
   final List<BaseItem> items = [];
   final List<BaseItem> offlineQueue = [];
@@ -31,13 +42,18 @@ class HomeController {
   bool isSyncing = false;
 
   late Box<String> box;
+  late Box settingsBox;
 
   Future<void> init() async {
     await ensureHiveIsValid();
 
-    
-
     box = await Hive.openBox<String>('items');
+    settingsBox = await Hive.openBox('settings');
+
+    final savedMode = settingsBox.get('sortMode');
+    if (savedMode != null) {
+      sortMode = SortMode.values[savedMode];
+    }
 
     items.clear();
     for (final jsonString in box.values) {
@@ -48,22 +64,15 @@ class HomeController {
       } catch (_) {}
     }
 
-    onUpdate(); // показва UI веднага
+    onUpdate();
 
-    // 🔥 2) Проверяваме интернет
     final hasInternet = await _checkInternet();
     if (!hasInternet) {
-      // ❗ Няма интернет → работим офлайн
       return;
     }
 
-    // 🔥 5) Зареждаме от Supabase (само ако има интернет)
     await _loadFromSupabase();
-
-    // 🔥 6) Realtime (само ако има интернет)
     _supabaseRealtime();
-
-    // 🔥 7) Синхронизация на offlineQueue (само ако има интернет)
     _retrySync();
   }
 
@@ -114,7 +123,6 @@ class HomeController {
           .from('items')
           .select();
 
-      // Успешно зареждане от Supabase
       items.clear();
       await box.clear();
 
@@ -125,7 +133,6 @@ class HomeController {
       }
 
     } catch (e) {
-      // ❗ Няма интернет → зареждаме само Hive
       items.clear();
 
       for (final jsonString in box.values) {
@@ -138,7 +145,7 @@ class HomeController {
     }
 
     isSyncing = false;
-    onUpdate();
+    sortItems();
   }
 
   void _supabaseRealtime() {
@@ -210,7 +217,13 @@ class HomeController {
     try {
       await supabaseService.deleteItem(item.id);
       items.remove(item);
+      sortItems();
       box.delete(item.id);
+
+      if (item is ReminderItem) {
+        NotificationService.cancelReminder(item.id);
+      }
+
       onUpdate();
     } catch (_) {
       offlineQueue.add(DeletedItemMarker(item.id));
@@ -343,11 +356,21 @@ class HomeController {
       items.add(item);
       box.put(item.id, jsonEncode(item.toJson()));
       await supabaseService.uploadItem(item);
+
+      if (item is ReminderItem) {
+        NotificationService.scheduleReminder(
+          id: item.id,
+          text: item.text,
+          dateTime: item.alarmTime,
+        );
+      }
+
       onUpdate();
     } catch (_) {
       offlineQueue.add(item);
       _retrySync();
     }
+    sortItems();
   }
 
   void updateItem(BaseItem updated) async {
@@ -360,10 +383,79 @@ class HomeController {
       box.put(updated.id, jsonEncode(updated.toJson()));
       await supabaseService.uploadOrUpdateItem(updated);
 
+      if (updated is ReminderItem) {
+        NotificationService.cancelReminder(updated.id);
+        NotificationService.scheduleReminder(
+          id: updated.id,
+          text: updated.text,
+          dateTime: updated.alarmTime,
+        );
+      }
+
       onUpdate();
     } catch (_) {
       offlineQueue.add(updated);
       _retrySync();
+    }
+    sortItems();
+  }
+
+  void sortItems() {
+    items.sort((a, b) {
+      // Ако и двата са ReminderItem → сортирай по alarmTime
+      if (a is ReminderItem && b is ReminderItem) {
+        return a.alarmTime.compareTo(b.alarmTime);
+      }
+
+      // Ако само A е ReminderItem → A е по-важен → нагоре
+      if (a is ReminderItem) return -1;
+
+      // Ако само B е ReminderItem → B е по-важен → нагоре
+      if (b is ReminderItem) return 1;
+
+      // Всички други типове → сортирай по createdAt
+      return a.createdAt.compareTo(b.createdAt);
+    });
+
+    onUpdate();
+  }
+
+  void deleteItemById(String id) {
+    BaseItem? item;
+
+    for (final i in items) {
+      if (i.id == id) {
+        item = i;
+        break;
+      }
+    }
+
+    if (item != null) {
+      deleteItem(item);
+    }
+  }
+
+  void updateReminderTime(String id, DateTime newTime) {
+    for (int i = 0; i < items.length; i++) {
+      final item = items[i];
+      if (item.id == id && item is ReminderItem) {
+        final updated = ReminderItem(
+          id: item.id,
+          createdAt: item.createdAt,
+          text: item.text,
+          alarmTime: newTime,
+        );
+
+        items[i] = updated;
+
+        sortItems();
+
+        box.put(item.id, jsonEncode(updated.toJson()));
+        supabaseService.uploadOrUpdateItem(updated);
+
+        onUpdate();
+        break;
+      }
     }
   }
 }

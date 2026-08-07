@@ -12,6 +12,7 @@ class AddReminderPage extends StatefulWidget {
 
 class _AddReminderPageState extends State<AddReminderPage> {
   final TextEditingController _textCtrl = TextEditingController();
+  DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
 
   @override
@@ -20,6 +21,7 @@ class _AddReminderPageState extends State<AddReminderPage> {
 
     if (widget.editItem != null) {
       _textCtrl.text = widget.editItem!.text;
+      _selectedDate = widget.editItem!.alarmTime;
       _selectedTime = _parseTime(widget.editItem!.alarmTime);
     }
   }
@@ -43,22 +45,49 @@ class _AddReminderPageState extends State<AddReminderPage> {
     }
   }
 
-  void _save() {
+  Future<void> _pickDate() async {
     final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? now,
+      firstDate: now,
+      lastDate: DateTime(now.year + 5),
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedDate = picked;
+      });
+    }
+  }
+
+  DateTime combineDateAndTime(DateTime date, TimeOfDay time) {
+    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+  }
+
+  void _save() {
+    if (_selectedDate == null || _selectedTime == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Моля, изберете дата и час за напомнянето.'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          ),
+          margin: EdgeInsets.all(12),
+        ),
+      );
+      return;
+    }
+
+    final combined = combineDateAndTime(_selectedDate!, _selectedTime!);
 
     final reminder = ReminderItem(
-      id: UniqueKey().toString(),
-      createdAt: now,
+      id: widget.editItem?.id ?? UniqueKey().toString(),              // ✔ ако редактираме → запазва ID
+      createdAt: widget.editItem?.createdAt ?? DateTime.now(),        // ✔ ако редактираме → запазва createdAt
       text: _textCtrl.text,
-      alarmTime: _selectedTime != null
-        ? DateTime(
-            now.year,
-            now.month,
-            now.day,
-            _selectedTime!.hour,
-            _selectedTime!.minute,
-          )
-        : DateTime.now()
+      alarmTime: combined,                                            // ✔ новата дата/час
     );
 
     Navigator.pop(context, reminder);
@@ -113,6 +142,15 @@ class _AddReminderPageState extends State<AddReminderPage> {
 
             Row(
               children: [
+                ElevatedButton.icon(
+                  onPressed: _pickDate,
+                  icon: const Icon(Icons.calendar_today),
+                  label: Text(
+                    _selectedDate == null
+                        ? "Избери дата"
+                        : "Дата: ${_selectedDate!.day.toString().padLeft(2, '0')}.${_selectedDate!.month.toString().padLeft(2, '0')}.${_selectedDate!.year}",
+                  ),
+                ),
                 ElevatedButton.icon(
                   onPressed: _pickTime,
                   icon: const Icon(Icons.alarm),

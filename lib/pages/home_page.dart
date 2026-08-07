@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:notexa/services/supabase_service.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'home_controller.dart';
+import '../services/permission_dialogs.dart';
 import '../models/base_item.dart';
 import '../widgets/item_grid_card.dart';
 
@@ -22,8 +23,18 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await showNotificationPermissionDialog(context);
+      await showExactAlarmDialog(context);
+    });
+
     controller = HomeController(onUpdate: () => setState(() {}));
     controller.init();
+    HomeController.instance.onUpdate = () {
+      setState(() {});
+    };
+    controller.sortItems();
   }
 
   void _showTypeMenu(BuildContext context) {
@@ -115,6 +126,28 @@ class _HomePageState extends State<HomePage> {
           IconButton(
             icon: const Icon(Icons.more_vert, size: 26),
             onPressed: () {},
+          ),
+          PopupMenuButton(
+            icon: const Icon(Icons.sort),
+            onSelected: (value) {
+              if(value == 'asc') {
+                controller.sortMode = SortMode.dateAsc;
+              } else {
+                controller.sortMode = SortMode.dateDesc;
+              }
+              controller.settingsBox.put('sortMode', controller.sortMode.index);
+              controller.sortItems();
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'asc',
+                child: Text('Дата (нарастващо)'),
+              ),
+              const PopupMenuItem(
+                value: 'desc',
+                child: Text('Дата (намаляващо)'),
+              ),
+            ],
           ),
           controller.isSyncing
               ? const Padding(

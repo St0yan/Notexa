@@ -4,10 +4,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '/pages/home_page.dart';
 import '/models/base_item.dart';
 import '/models/deleted_item_marker.dart';
+import '/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  await NotificationService.init();
   await Hive.initFlutter();
 
   Hive.registerAdapter(ItemTypeAdapter());
