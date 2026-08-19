@@ -29,12 +29,11 @@ class _HomePageState extends State<HomePage> {
       await showExactAlarmDialog(context);
     });
 
-    controller = HomeController(onUpdate: () => setState(() {}));
-    controller.init();
-    HomeController.instance.onUpdate = () {
+    controller = HomeController(onUpdate: () {
+      controller.sortItems();
       setState(() {});
-    };
-    controller.sortItems();
+    });
+    controller.init();
   }
 
   void _showTypeMenu(BuildContext context) {
@@ -128,15 +127,23 @@ class _HomePageState extends State<HomePage> {
             onPressed: () {},
           ),
           PopupMenuButton(
-            icon: const Icon(Icons.sort),
+            icon: Icon(
+              controller.sortMode == SortMode.dateAsc
+                  ? Icons.arrow_upward
+                  : Icons.arrow_downward,
+              size: 26,
+            ),
             onSelected: (value) {
-              if(value == 'asc') {
+              if (value == 'asc') {
                 controller.sortMode = SortMode.dateAsc;
               } else {
                 controller.sortMode = SortMode.dateDesc;
               }
+
               controller.settingsBox.put('sortMode', controller.sortMode.index);
-              controller.sortItems();
+
+              controller.sortItems();   // сортира веднага
+              setState(() {});          // обновява UI веднага
             },
             itemBuilder: (_) => [
               const PopupMenuItem(

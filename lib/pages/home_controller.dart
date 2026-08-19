@@ -64,10 +64,13 @@ class HomeController {
       } catch (_) {}
     }
 
+    isSyncing = true;
     onUpdate();
 
     final hasInternet = await _checkInternet();
     if (!hasInternet) {
+      isSyncing = false;
+      onUpdate();
       return;
     }
 
@@ -155,8 +158,10 @@ class HomeController {
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'items',
-      callback: (payload) {
-        _loadFromSupabase();
+      callback: (payload) async {
+        if(!isSyncing) {
+          await _loadFromSupabase();
+        }
       },
     );
 
@@ -165,11 +170,18 @@ class HomeController {
 
   Future<void> _retrySync() async {
     final hasInternet = await _checkInternet();
-      if (!hasInternet) return;
+      if (!hasInternet) {
+        isSyncing = false;
+        onUpdate();
+        return;
+      }
 
-    if (offlineQueue.isEmpty) return;
+    if (offlineQueue.isEmpty) {
+      isSyncing = false;
+      onUpdate();
+      return;
+    }
 
-    isSyncing = true;
     onUpdate();
 
     final List<BaseItem> stillPending = [];
@@ -402,22 +414,27 @@ class HomeController {
 
   void sortItems() {
     items.sort((a, b) {
-      // Ако и двата са ReminderItem → сортирай по alarmTime
-      if (a is ReminderItem && b is ReminderItem) {
-        return a.alarmTime.compareTo(b.alarmTime);
+      DateTime dateA;
+      DateTime dateB;
+
+      if (a is ReminderItem) {
+        dateA = a.alarmTime;
+      } else {
+        dateA = a.createdAt;
       }
 
-      // Ако само A е ReminderItem → A е по-важен → нагоре
-      if (a is ReminderItem) return -1;
+      if (b is ReminderItem) {
+        dateB = b.alarmTime;
+      } else {
+        dateB = b.createdAt;
+      }
 
-      // Ако само B е ReminderItem → B е по-важен → нагоре
-      if (b is ReminderItem) return 1;
-
-      // Всички други типове → сортирай по createdAt
-      return a.createdAt.compareTo(b.createdAt);
+      if (sortMode == SortMode.dateAsc) {
+        return dateA.compareTo(dateB);
+      } else {
+        return dateB.compareTo(dateA);
+      }
     });
-
-    onUpdate();
   }
 
   void deleteItemById(String id) {

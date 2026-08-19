@@ -121,16 +121,44 @@ class _AddTaskPageState extends State<AddTaskPage> {
                 itemCount: entries.length,
                 itemBuilder: (context, index) {
                   final entry = entries[index];
+                  final controller = TextEditingController(text: entry.text);
 
-                  return CheckboxListTile(
-                    value: entry.isDone,
-                    title: Text(entry.text),
-                    onChanged: (value) {
-                      setState(() {
-                        entry.isDone = value!;
-                        entries[index] = entry;
-                      });
-                    },
+                  return Row(
+                    children: [
+                      // Чекбокс
+                      Checkbox(
+                        value: entry.isDone,
+                        onChanged: (value) {
+                          setState(() {
+                            entry.isDone = value!;
+                          });
+                        },
+                      ),
+
+                      // Поле за редакция
+                      Expanded(
+                        child: TextField(
+                          controller: controller,
+                          textCapitalization: TextCapitalization.sentences,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                          ),
+                          onChanged: (value) {
+                            entry.text = value;
+                          },
+                        ),
+                      ),
+
+                      // Бутон за изтриване
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.red),
+                        onPressed: () {
+                          setState(() {
+                            entries.removeAt(index);
+                          });
+                        },
+                      ),
+                    ],
                   );
                 },
               ),

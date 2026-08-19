@@ -1,6 +1,6 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
-import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/data/latest_all.dart' as tz;
 import '../pages/home_controller.dart';
 import 'package:flutter/services.dart';
 
@@ -49,37 +49,36 @@ class NotificationService {
     required DateTime dateTime,
   }) async {
     final tz.TZDateTime scheduledDate = tz.TZDateTime.from(dateTime, tz.local);
-    await _plugin.zonedSchedule(
-      id: id.hashCode,
-      title: 'Напомняне',
-      body: text,
-      payload: id,
-      notificationDetails: const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'reminder_channel',
-          'Напомняния',
-          importance: Importance.max,
-          priority: Priority.high,
-          sound: RawResourceAndroidNotificationSound('notify_notexa'),
-          actions: <AndroidNotificationAction>[
-            AndroidNotificationAction(
-              'snooze_1h',
-              'Отлагане с 1 час',
-              showsUserInterface: true,
-            ),
-            AndroidNotificationAction(
-              'mark_done',
-              'Изпълнено',
-              showsUserInterface: true,
-            ),
-          ],
+      await _plugin.zonedSchedule(
+        id: id.hashCode,
+        title: 'Напомняне',
+        body: text,
+        payload: id,
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'reminder_channel',
+            'Напомняния',
+            importance: Importance.max,
+            priority: Priority.high,
+            sound: RawResourceAndroidNotificationSound('notify_notexa'),
+            actions: <AndroidNotificationAction>[
+              AndroidNotificationAction(
+                'snooze_1h',
+                'Отлагане с 1 час',
+                showsUserInterface: true,
+              ),
+              AndroidNotificationAction(
+                'mark_done',
+                'Изпълнено',
+                showsUserInterface: true,
+              ),
+            ],
+          ),
         ),
-      ),
-      scheduledDate: scheduledDate,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: null,
-    );
-
+        scheduledDate: scheduledDate,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        matchDateTimeComponents: null,
+      );
   }
 
   static Future<void> cancelReminder(String id) async {
