@@ -19,20 +19,17 @@ import 'add_reminder_page.dart';
 import 'add_task_page.dart';
 
 enum SortMode {
-    dateAsc,
-    dateDesc
-  }
+  dateAsc,
+  dateDesc
+}
 
 class HomeController {
 
-  HomeController._private();
-
-  static final HomeController instance = HomeController._private();
-
+  static late HomeController instance;
   late Function onUpdate;
   final supabaseService = SupabaseService();
 
-  HomeController({required this.onUpdate});
+  HomeController({required this.onUpdate}) { instance = this; }
 
   SortMode sortMode = SortMode.dateAsc;
 
@@ -43,6 +40,14 @@ class HomeController {
 
   late Box<String> box;
   late Box settingsBox;
+
+  late VoidCallback onItemsChanged;
+  late VoidCallback onThemeChanged;
+
+  ThemeMode get currentTheme {
+    final index = settingsBox.get('themeMode', defaultValue: ThemeMode.system.index);
+    return ThemeMode.values[index];
+  }
 
   Future<void> init() async {
     await ensureHiveIsValid();
@@ -474,5 +479,50 @@ class HomeController {
         break;
       }
     }
+  }
+
+  void setTheme(ThemeMode mode) {
+    settingsBox.put('themeMode', mode.index);
+    if (onThemeChanged != null) {
+      onThemeChanged();
+    }
+  }
+
+  void sortByDate() {
+    if (sortMode == SortMode.dateAsc) {
+      items.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    } else {
+      items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }
+
+    if (onItemsChanged != null) {
+      onItemsChanged();
+    }
+  }
+
+  void sortByType() {
+    items.sort((a, b) => a.type.index.compareTo(b.type.index));
+    if (onItemsChanged != null) {
+      onItemsChanged();
+    }
+  }
+
+  void sortAlphabetically() {
+    items.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+    if (onItemsChanged != null) {
+      onItemsChanged();
+    }
+  }
+
+  ItemType? currentFilter;
+
+  void filterBy(ItemType? type) {
+    currentFilter = type;
+    onUpdate();
+  }
+
+  void setFontSize(int sizeIndex) {
+    settingsBox.put('fontSize', sizeIndex);
+    onUpdate();
   }
 }

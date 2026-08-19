@@ -10,6 +10,7 @@ class ItemGridCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final VoidCallback onEdit;
+  final double fontSize;
 
   const ItemGridCard({
     super.key,
@@ -17,6 +18,7 @@ class ItemGridCard extends StatelessWidget {
     required this.onTap,
     required this.onDelete,
     required this.onEdit,
+    required this.fontSize,
   });
 
   @override
@@ -26,7 +28,7 @@ class ItemGridCard extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       onLongPress: () {
-        HapticFeedback.mediumImpact(); // 🔥 iOS-style вибрация
+        HapticFeedback.mediumImpact();
 
         final RenderBox box = context.findRenderObject() as RenderBox;
         final Offset pos = box.localToGlobal(Offset.zero);
@@ -39,7 +41,6 @@ class ItemGridCard extends StatelessWidget {
           pageBuilder: (_, __, ___) {
             return Stack(
               children: [
-                // 🔥 Blur background (Frosted Glass)
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
                   child: BackdropFilter(
@@ -48,7 +49,6 @@ class ItemGridCard extends StatelessWidget {
                   ),
                 ),
 
-                // 🔥 Bubble menu with animation
                 Positioned(
                   left: pos.dx + box.size.width - 160,
                   top: pos.dy - 10,
@@ -93,9 +93,10 @@ class ItemGridCard extends StatelessWidget {
               getTitleForItem(item),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 15,
+              style: TextStyle(
+                fontSize: fontSize,
                 fontWeight: FontWeight.w600,
+                color: const Color.fromARGB(255, 219, 4, 4)
               ),
             ),
             const SizedBox(height: 6),

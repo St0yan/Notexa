@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:notexa/services/supabase_service.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'home_controller.dart';
 import '../services/permission_dialogs.dart';
 import '../models/base_item.dart';
 import '../widgets/item_grid_card.dart';
+import 'menu_controller.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -19,6 +21,8 @@ class _HomePageState extends State<HomePage> {
   final supabaseService = SupabaseService();
   final List<BaseItem> items = [];
   late Box<String> box;
+  final GlobalKey menuButtonKey = GlobalKey();
+  final TextEditingController searchCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -29,11 +33,14 @@ class _HomePageState extends State<HomePage> {
       await showExactAlarmDialog(context);
     });
 
-    controller = HomeController(onUpdate: () {
-      controller.sortItems();
+    controller = HomeController.instance;
+    controller.onItemsChanged = () {
+      setState(() {});
+    };
+
+    searchCtrl.addListener(() {
       setState(() {});
     });
-    controller.init();
   }
 
   void _showTypeMenu(BuildContext context) {
@@ -112,50 +119,68 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final fontSizeIndex = controller.settingsBox.get('fontSize', defaultValue: 1);
+
+    double fontSize;
+    switch (fontSizeIndex) {
+      case 0: fontSize = 14; break;
+      case 1: fontSize = 16; break;
+      case 2: fontSize = 18; break;
+      default: fontSize = 16;
+    }
+
+    List<BaseItem> visibleItems = controller.currentFilter == null
+        ? controller.items
+        : controller.items.where((i) => i.type == controller.currentFilter).toList();
+
+    if (searchCtrl.text.isNotEmpty) {
+      final query = searchCtrl.text.toLowerCase();
+
+      visibleItems = visibleItems.where((item) {
+        return item.title.toLowerCase().contains(query);
+      }).toList();
+    }
+
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 0,
         titleSpacing: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.search, size: 26),
-          onPressed: () {},
+        title: Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: Container(
+            height: 40,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: TextField(
+              controller: searchCtrl,
+              decoration: InputDecoration(
+                hintText: 'Търси...',
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                suffixIcon: searchCtrl.text.isEmpty
+                    ? const Icon(Icons.search)
+                    : IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          searchCtrl.clear();
+                          FocusScope.of(context).unfocus();
+                          setState(() {});
+                        },
+                      ),
+              ),
+            ),
+          ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.more_vert, size: 26),
-            onPressed: () {},
+            key: menuButtonKey,
+            icon: const Icon(Icons.menu),
+            onPressed: () => showMainMenu(context, menuButtonKey),
           ),
-          PopupMenuButton(
-            icon: Icon(
-              controller.sortMode == SortMode.dateAsc
-                  ? Icons.arrow_upward
-                  : Icons.arrow_downward,
-              size: 26,
-            ),
-            onSelected: (value) {
-              if (value == 'asc') {
-                controller.sortMode = SortMode.dateAsc;
-              } else {
-                controller.sortMode = SortMode.dateDesc;
-              }
-
-              controller.settingsBox.put('sortMode', controller.sortMode.index);
-
-              controller.sortItems();   // сортира веднага
-              setState(() {});          // обновява UI веднага
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: 'asc',
-                child: Text('Дата (нарастващо)'),
-              ),
-              const PopupMenuItem(
-                value: 'desc',
-                child: Text('Дата (намаляващо)'),
-              ),
-            ],
-          ),
+          
           controller.isSyncing
               ? const Padding(
                   padding: EdgeInsets.only(right: 16),
@@ -168,16 +193,19 @@ class _HomePageState extends State<HomePage> {
               : const Icon(Icons.check_circle, color: Colors.green),
         ],
       ),
-      body: MasonryGridView.count(
+      body: 
+      MasonryGridView.count(
+        key: ValueKey(searchCtrl.text),
         crossAxisCount: 3,
         mainAxisSpacing: 8,
         crossAxisSpacing: 8,
         padding: const EdgeInsets.all(8),
-        itemCount: controller.items.length,
+        itemCount: visibleItems.length,
         itemBuilder: (context, index) {
-          final item = controller.items[index];
+          final item = visibleItems[index];
           return ItemGridCard(
             item: item,
+            fontSize: fontSize,
             onTap: () => controller.openItem(context, item),
             onDelete: () {
               controller.deleteItem(item);
