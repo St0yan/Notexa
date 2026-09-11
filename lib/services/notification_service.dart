@@ -15,6 +15,7 @@ class NotificationService {
     tz.initializeTimeZones();
     tz.setLocalLocation(tz.getLocation('Europe/Sofia'));
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const AndroidInitializationSettings('notify_icon');
 
     const settings = InitializationSettings(
       android: android,
@@ -61,17 +62,15 @@ class NotificationService {
             importance: Importance.max,
             priority: Priority.high,
             sound: RawResourceAndroidNotificationSound('notify_notexa'),
+            icon: 'notify_icon',
             actions: <AndroidNotificationAction>[
-              AndroidNotificationAction(
-                'snooze_1h',
-                'Отлагане с 1 час',
-                showsUserInterface: true,
-              ),
-              AndroidNotificationAction(
-                'mark_done',
-                'Изпълнено',
-                showsUserInterface: true,
-              ),
+              AndroidNotificationAction('snooze_15m', 'Отлагане 15 мин', showsUserInterface: true),
+              AndroidNotificationAction('snooze_30m', 'Отлагане 30 мин', showsUserInterface: true),
+              AndroidNotificationAction('snooze_1h', 'Отлагане 1 час', showsUserInterface: true),
+              AndroidNotificationAction('snooze_2h', 'Отлагане 2 часа', showsUserInterface: true),
+              AndroidNotificationAction('snooze_tomorrow', 'До утре сутрин', showsUserInterface: true),
+              AndroidNotificationAction('snooze_monday', 'До понеделник', showsUserInterface: true),
+              AndroidNotificationAction('mark_done', 'Изпълнено', showsUserInterface: true),
             ],
           ),
         ),
@@ -87,28 +86,61 @@ class NotificationService {
 
   static void handleAction(NotificationResponse response) async {
     final actionId = response.actionId;
-    final payload = response.payload;
+    final itemId = response.payload;
 
-    if (actionId == 'snooze_1h') {
-      _handleSnooze(payload);
+    if (actionId == 'snooze_15m') {
+      _handleSnooze(itemId, const Duration(minutes: 15));
+    } else if (actionId == 'snooze_30m') {
+      _handleSnooze(itemId, const Duration(minutes: 30));
+    } else if (actionId == 'snooze_1h') {
+      _handleSnooze(itemId, const Duration(hours: 1));
+    } else if (actionId == 'snooze_2h') {
+      _handleSnooze(itemId, const Duration(hours: 2));
+    } else if (actionId == 'snooze_tomorrow') {
+      _handleSnoozeTomorrow(itemId);
+    } else if (actionId == 'snooze_monday') {
+      _handleSnoozeMonday(itemId);
     } else if (actionId == 'mark_done') {
-      _handleMarkDone(payload);
+      _handleMarkDone(itemId);
     }
   }
 
-  static Future<void> _handleSnooze(String? itemId) async {
+  static Future<void> _handleSnooze(String? itemId, Duration duration) async {
+    if (itemId == null) return;
+
+    final newTime = DateTime.now().add(duration);
+
+    HomeController.instance.updateReminderTime(itemId, newTime);
+
+    final item = HomeController.instance.items.firstWhere((i) => i.id == itemId);
+    await scheduleReminder(id: itemId, text: item.title, dateTime: newTime);
+  }
+
+  static Future<void> _handleSnoozeTomorrow(String? itemId) async {
     if (itemId == null) return;
 
     final now = DateTime.now();
-    final newTime = now.add(const Duration(hours: 1));
+    final tomorrow = DateTime(now.year, now.month, now.day + 1, 8, 0);
 
-    await scheduleReminder(
-      id: itemId,
-      text: 'Отложено напомняне',
-      dateTime: newTime,
-    );
+    HomeController.instance.updateReminderTime(itemId, tomorrow);
 
-    HomeController.instance.updateReminderTime(itemId, newTime);
+    final item = HomeController.instance.items.firstWhere((i) => i.id == itemId);
+    await scheduleReminder(id: itemId, text: item.title, dateTime: tomorrow);
+  }
+
+  static Future<void> _handleSnoozeMonday(String? itemId) async {
+    if (itemId == null) return;
+
+    final now = DateTime.now();
+    int daysToMonday = (DateTime.monday - now.weekday) % 7;
+    if (daysToMonday == 0) daysToMonday = 7; // ако е понеделник → следващия понеделник
+
+    final monday = DateTime(now.year, now.month, now.day + daysToMonday, 8, 0);
+
+    HomeController.instance.updateReminderTime(itemId, monday);
+
+    final item = HomeController.instance.items.firstWhere((i) => i.id == itemId);
+    await scheduleReminder(id: itemId, text: item.title, dateTime: monday);
   }
 
   static Future<void> _handleMarkDone(String? itemId) async {

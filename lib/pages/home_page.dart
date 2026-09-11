@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:notexa/services/supabase_service.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'home_controller.dart';
 import '../services/permission_dialogs.dart';
 import '../models/base_item.dart';
@@ -10,17 +7,14 @@ import '../widgets/item_grid_card.dart';
 import 'menu_controller.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final HomeController controller;
+  const HomePage({super.key, required this.controller});
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  late final HomeController controller;
-  final supabaseService = SupabaseService();
-  final List<BaseItem> items = [];
-  late Box<String> box;
   final GlobalKey menuButtonKey = GlobalKey();
   final TextEditingController searchCtrl = TextEditingController();
 
@@ -33,8 +27,7 @@ class _HomePageState extends State<HomePage> {
       await showExactAlarmDialog(context);
     });
 
-    controller = HomeController.instance;
-    controller.onItemsChanged = () {
+    widget.controller.onItemsChanged = () {
       setState(() {});
     };
 
@@ -55,36 +48,31 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _typeButton(
-                context,
+              _typeButton(context,
                 icon: Icons.note_alt,
                 color: Colors.yellow.shade600,
                 text: "Бележка",
                 type: ItemType.note,
               ),
-              _typeButton(
-                context,
+              _typeButton(context,
                 icon: Icons.checklist,
                 color: Colors.blue.shade600,
                 text: "Задача",
                 type: ItemType.task,
               ),
-              _typeButton(
-                context,
+              _typeButton(context,
                 icon: Icons.lightbulb,
                 color: Colors.orange.shade600,
                 text: "Идея",
                 type: ItemType.idea,
               ),
-              _typeButton(
-                context,
+              _typeButton(context,
                 icon: Icons.alarm,
                 color: Colors.red.shade600,
                 text: "Напомняне",
                 type: ItemType.reminder,
               ),
-              _typeButton(
-                context,
+              _typeButton(context,
                 icon: Icons.flag,
                 color: Colors.green.shade600,
                 text: "Цел",
@@ -106,20 +94,17 @@ class _HomePageState extends State<HomePage> {
   }) {
     return ListTile(
       leading: Icon(icon, color: color, size: 28),
-      title: Text(
-        text,
-        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-      ),
+      title: Text(text, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
       onTap: () {
         Navigator.pop(context);
-        controller.createNewItem(context, type);
+        widget.controller.createNewItem(context, type);
       },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final fontSizeIndex = controller.settingsBox.get('fontSize', defaultValue: 1);
+    final fontSizeIndex = widget.controller.settingsBox.get('fontSize', defaultValue: 1);
 
     double fontSize;
     switch (fontSizeIndex) {
@@ -129,22 +114,23 @@ class _HomePageState extends State<HomePage> {
       default: fontSize = 16;
     }
 
-    List<BaseItem> visibleItems = controller.currentFilter == null
-        ? controller.items
-        : controller.items.where((i) => i.type == controller.currentFilter).toList();
+    List<BaseItem> visibleItems = widget.controller.currentFilter == null
+        ? widget.controller.items
+        : widget.controller.items.where((i) => i.type == widget.controller.currentFilter).toList();
+    
+    if (widget.controller.currentFilter != null) {
+      visibleItems = visibleItems
+          .where((i) => i.type == widget.controller.currentFilter)
+          .toList();
+    }
 
     if (searchCtrl.text.isNotEmpty) {
       final query = searchCtrl.text.toLowerCase();
-
-      visibleItems = visibleItems.where((item) {
-        return item.title.toLowerCase().contains(query);
-      }).toList();
+      visibleItems = visibleItems.where((item) => item.title.toLowerCase().contains(query)).toList();
     }
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
-        elevation: 0,
         titleSpacing: 0,
         title: Padding(
           padding: const EdgeInsets.only(right: 12),
@@ -167,7 +153,6 @@ class _HomePageState extends State<HomePage> {
                         onPressed: () {
                           searchCtrl.clear();
                           FocusScope.of(context).unfocus();
-                          setState(() {});
                         },
                       ),
               ),
@@ -180,8 +165,7 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.menu),
             onPressed: () => showMainMenu(context, menuButtonKey),
           ),
-          
-          controller.isSyncing
+          widget.controller.isSyncing
               ? const Padding(
                   padding: EdgeInsets.only(right: 16),
                   child: SizedBox(
@@ -193,8 +177,7 @@ class _HomePageState extends State<HomePage> {
               : const Icon(Icons.check_circle, color: Colors.green),
         ],
       ),
-      body: 
-      MasonryGridView.count(
+      body: MasonryGridView.count(
         key: ValueKey(searchCtrl.text),
         crossAxisCount: 3,
         mainAxisSpacing: 8,
@@ -206,9 +189,9 @@ class _HomePageState extends State<HomePage> {
           return ItemGridCard(
             item: item,
             fontSize: fontSize,
-            onTap: () => controller.openItem(context, item),
+            onTap: () => widget.controller.openItem(context, item),
             onDelete: () {
-              controller.deleteItem(item);
+              widget.controller.deleteItem(item);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Елементът е изтрит!'),
@@ -221,7 +204,7 @@ class _HomePageState extends State<HomePage> {
                 ),
               );
             },
-            onEdit: () => controller.openItem(context, item),
+            onEdit: () => widget.controller.openItem(context, item),
           );
         },
       ),

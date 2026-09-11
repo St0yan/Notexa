@@ -33,6 +33,7 @@ class TaskEntry {
 
 @HiveType(typeId: 3)
 class TaskItem extends BaseItem {
+  @override
   @HiveField(3)
   final String title;
 

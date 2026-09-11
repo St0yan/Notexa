@@ -151,21 +151,21 @@ void showSortMenu(BuildContext context, RelativeRect position) {
         onTap: () {
           controller.sortMode = SortMode.dateAsc;
           controller.sortByDate();
-          controller.onUpdate();
+          controller.onItemsChanged?.call();
         },
       ),
       PopupMenuItem(
         child: const Text("Тип"),
         onTap: () {
           controller.sortByType();
-          controller.onUpdate();
+          controller.onItemsChanged?.call();
         },
       ),
       PopupMenuItem(
         child: const Text("Азбучно"),
         onTap: () {
           controller.sortAlphabetically();
-          controller.onUpdate();
+          controller.onItemsChanged?.call();
         },
       ),
     ],

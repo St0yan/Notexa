@@ -17,6 +17,8 @@ dependencies:
   timezone: ^0.11.1
   url_launcher: ^6.2.5
   linkify: ^5.0.0
+  flutter_launcher_icons: ^0.14.4
+  connectivity_plus: ^7.3.1
 
 dev_dependencies:
   flutter_test:
@@ -27,3 +29,12 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/notexa-logo.png
+    - assets/notify_icon.png
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/notexa-logo.png"
+  addaptive_icon_foreground: "assets/notexa-logo.png"

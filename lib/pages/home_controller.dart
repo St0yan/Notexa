@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:timezone/timezone.dart';
 import 'dart:io';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
@@ -17,6 +18,7 @@ import 'add_idea_page.dart';
 import 'add_note_page.dart';
 import 'add_reminder_page.dart';
 import 'add_task_page.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 enum SortMode {
   dateAsc,
@@ -26,22 +28,21 @@ enum SortMode {
 class HomeController {
 
   static late HomeController instance;
-  late Function onUpdate;
   final supabaseService = SupabaseService();
 
-  HomeController({required this.onUpdate}) { instance = this; }
+  HomeController() { instance = this; }
 
   SortMode sortMode = SortMode.dateAsc;
 
   final List<BaseItem> items = [];
-  final List<BaseItem> offlineQueue = [];
 
   bool isSyncing = false;
 
   late Box<String> box;
   late Box settingsBox;
+  late Box<String> offlineBox;
 
-  late VoidCallback onItemsChanged;
+  VoidCallback? onItemsChanged;
   late VoidCallback onThemeChanged;
 
   ThemeMode get currentTheme {
@@ -54,6 +55,7 @@ class HomeController {
 
     box = await Hive.openBox<String>('items');
     settingsBox = await Hive.openBox('settings');
+    offlineBox = await Hive.openBox<String>('offline_queue');
 
     final savedMode = settingsBox.get('sortMode');
     if (savedMode != null) {
@@ -69,19 +71,21 @@ class HomeController {
       } catch (_) {}
     }
 
-    isSyncing = true;
-    onUpdate();
+    sortItems();
+    onItemsChanged?.call();
 
     final hasInternet = await _checkInternet();
-    if (!hasInternet) {
-      isSyncing = false;
-      onUpdate();
-      return;
+    if (hasInternet) {
+      await _loadFromSupabase();
+      _supabaseRealtime();
+      _retrySync();
     }
 
-    await _loadFromSupabase();
-    _supabaseRealtime();
-    _retrySync();
+    Connectivity().onConnectivityChanged.listen((status) {
+      if (status != ConnectivityResult.none) {
+        _retrySync();
+      }
+    });
   }
 
   List<BaseItem> decodeHiveItems(List<String> values) {
@@ -124,36 +128,76 @@ class HomeController {
 
   Future<void> _loadFromSupabase() async {
     isSyncing = true;
-    onUpdate();
+    onItemsChanged?.call();
 
+    List<dynamic> remoteItems = [];
+
+    // --- 1) Опит за зареждане от Supabase ---
     try {
-      final data = await Supabase.instance.client
+      remoteItems = await Supabase.instance.client
           .from('items')
           .select();
+    } catch (_) {
+      // Няма интернет → използваме локалните данни
+      isSyncing = false;
+      sortItems();
+      return;
+    }
 
-      items.clear();
-      await box.clear();
+    // --- 2) Merge map ---
+    final Map<String, BaseItem> merged = {};
 
-      for (final row in data) {
-        final item = supabaseService.decodeItem(row);
-        items.add(item);
-        box.put(item.id, jsonEncode(row));
-      }
+    // --- 3) Локални items ---
+    for (final jsonString in box.values) {
+      try {
+        final json = jsonDecode(jsonString);
 
-    } catch (e) {
-      items.clear();
+        // Ако локално е deleted → игнорирай
+        if (json['type'] == 'deleted') continue;
 
-      for (final jsonString in box.values) {
-        try {
-          final json = jsonDecode(jsonString);
-          final item = supabaseService.decodeItem(json);
-          items.add(item);
-        } catch (_) {}
+        final item = supabaseService.decodeItem(json);
+        merged[item.id] = item;
+      } catch (_) {
+        // Ако локалният JSON е повреден → игнорирай
+        continue;
       }
     }
 
+    // --- 4) Remote items ---
+    for (final row in remoteItems) {
+      try {
+        // Ако локално е deleted → remote не трябва да overwrite-ва
+        if (box.containsKey(row['id'])) {
+          final localJson = jsonDecode(box.get(row['id'])!);
+          if (localJson['type'] == 'deleted') {
+            continue;
+          }
+        }
+
+        final item = supabaseService.decodeItem(row);
+
+        // Ако remote е DeletedItemMarker → игнорирай
+        if (item is DeletedItemMarker) continue;
+
+        // Добави/overwrite remote item
+        merged[item.id] = item;
+
+        // 🔥 Записваме item.toJson(), НЕ Supabase JSON
+        box.put(item.id, jsonEncode(item.toJson()));
+      } catch (_) {
+        // Ако remote JSON е повреден → игнорирай
+        continue;
+      }
+    }
+
+    // --- 5) Обновяване на списъка ---
+    items
+      ..clear()
+      ..addAll(merged.values);
+
     isSyncing = false;
     sortItems();
+    onItemsChanged?.call();
   }
 
   void _supabaseRealtime() {
@@ -175,42 +219,74 @@ class HomeController {
 
   Future<void> _retrySync() async {
     final hasInternet = await _checkInternet();
-      if (!hasInternet) {
-        isSyncing = false;
-        onUpdate();
-        return;
-      }
+    if (!hasInternet) return;
 
-    if (offlineQueue.isEmpty) {
-      isSyncing = false;
-      onUpdate();
-      return;
-    }
+    if (offlineBox.isEmpty) return;
 
-    onUpdate();
+    isSyncing = true;
+    onItemsChanged?.call();
 
-    final List<BaseItem> stillPending = [];
+    final List<String> stillPending = [];
 
-    for (final item in offlineQueue) {
+    for (final jsonString in offlineBox.values) {
       try {
+        final json = jsonDecode(jsonString);
+
+        // 🔥 Безопасно декодиране
+        final item = supabaseService.decodeItem(json);
+
+        // 🔥 Ако е DeletedItemMarker → изтриваме remote
         if (item is DeletedItemMarker) {
-          await supabaseService.deleteItem(item.id);
-        } else {
-          await supabaseService.uploadOrUpdateItem(item);
+          try {
+            await supabaseService.deleteItem(item.id);
+          } catch (_) {
+            // remote delete неуспешно → оставяме за следващ retry
+            stillPending.add(jsonString);
+          }
+          continue;
         }
+
+        // 🔥 Проверка дали remote item съществува
+        bool existsRemote = false;
+        try {
+          existsRemote = await supabaseService.exists(item.id);
+        } catch (_) {
+          // ако Supabase хвърли грешка → оставяме за следващ retry
+          stillPending.add(jsonString);
+          continue;
+        }
+
+        // 🔥 Upload или Update
+        try {
+          if (!existsRemote) {
+            await supabaseService.uploadItem(item);
+          } else {
+            await supabaseService.uploadOrUpdateItem(item);
+          }
+        } catch (_) {
+          // неуспешен upload/update → оставяме за следващ retry
+          stillPending.add(jsonString);
+        }
+
       } catch (_) {
-        stillPending.add(item);
+        // JSON повреден → оставяме го за следващ retry
+        stillPending.add(jsonString);
       }
     }
 
-    offlineQueue
-      ..clear()
-      ..addAll(stillPending);
+    // 🔥 Изчистваме offlineBox
+    await offlineBox.clear();
+
+    // 🔥 Връщаме само тези, които не успяха
+    for (final pending in stillPending) {
+      offlineBox.add(pending);
+    }
 
     isSyncing = false;
-    onUpdate();
+    onItemsChanged?.call();
 
-    if (offlineQueue.isNotEmpty) {
+    // 🔥 Ако има още pending → опитваме пак след 5 секунди
+    if (offlineBox.isNotEmpty) {
       Future.delayed(const Duration(seconds: 5), _retrySync);
     }
   }
@@ -233,22 +309,36 @@ class HomeController {
   void deleteItem(BaseItem item) async {
     try {
       await supabaseService.deleteItem(item.id);
+
       items.remove(item);
-      sortItems();
       box.delete(item.id);
 
       if (item is ReminderItem) {
         NotificationService.cancelReminder(item.id);
       }
 
-      onUpdate();
+      sortItems();
+      onItemsChanged?.call();
+
     } catch (_) {
-      offlineQueue.add(DeletedItemMarker(item.id));
+      final marker = DeletedItemMarker(item.id);
+
+      offlineBox.add(jsonEncode(marker.toJson()));
+      box.put(item.id, jsonEncode(marker.toJson()));
+
       _retrySync();
     }
   }
 
   void openItem(BuildContext context, BaseItem item) {
+    if (item is DeletedItemMarker) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Този елемент е маркиран за изтриване."),
+        ),
+      );
+      return;
+    }
     switch (item.type) {
       case ItemType.idea:
         Navigator.push(
@@ -368,10 +458,9 @@ class HomeController {
 
   void addNewItem(BaseItem item) async {
     try {
-      final json = item.toJson();
-
       items.add(item);
       box.put(item.id, jsonEncode(item.toJson()));
+
       await supabaseService.uploadItem(item);
 
       if (item is ReminderItem) {
@@ -382,22 +471,22 @@ class HomeController {
         );
       }
 
-      onUpdate();
+      sortItems();
+      onItemsChanged?.call();
+
     } catch (_) {
-      offlineQueue.add(item);
+      offlineBox.add(jsonEncode(item.toJson()));
       _retrySync();
     }
-    sortItems();
   }
 
   void updateItem(BaseItem updated) async {
     try {
       final index = items.indexWhere((i) => i.id == updated.id);
-      if (index != -1) {
-        items[index] = updated;
-      }
+      if (index != -1) items[index] = updated;
 
       box.put(updated.id, jsonEncode(updated.toJson()));
+
       await supabaseService.uploadOrUpdateItem(updated);
 
       if (updated is ReminderItem) {
@@ -409,12 +498,13 @@ class HomeController {
         );
       }
 
-      onUpdate();
+      sortItems();
+      onItemsChanged?.call();
+
     } catch (_) {
-      offlineQueue.add(updated);
+      offlineBox.add(jsonEncode(updated.toJson()));
       _retrySync();
     }
-    sortItems();
   }
 
   void sortItems() {
@@ -473,9 +563,13 @@ class HomeController {
         sortItems();
 
         box.put(item.id, jsonEncode(updated.toJson()));
-        supabaseService.uploadOrUpdateItem(updated);
+        try {
+          supabaseService.uploadOrUpdateItem(updated);
+        } catch (_) {
+          offlineBox.add(jsonEncode(updated.toJson()));
+        }
 
-        onUpdate();
+        onItemsChanged?.call();
         break;
       }
     }
@@ -483,10 +577,8 @@ class HomeController {
 
   void setTheme(ThemeMode mode) {
     settingsBox.put('themeMode', mode.index);
-    if (onThemeChanged != null) {
-      onThemeChanged();
+    onThemeChanged();
     }
-  }
 
   void sortByDate() {
     if (sortMode == SortMode.dateAsc) {
@@ -495,34 +587,28 @@ class HomeController {
       items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     }
 
-    if (onItemsChanged != null) {
-      onItemsChanged();
+    onItemsChanged?.call();
     }
-  }
 
   void sortByType() {
     items.sort((a, b) => a.type.index.compareTo(b.type.index));
-    if (onItemsChanged != null) {
-      onItemsChanged();
+    onItemsChanged?.call();
     }
-  }
 
   void sortAlphabetically() {
     items.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
-    if (onItemsChanged != null) {
-      onItemsChanged();
+    onItemsChanged?.call();
     }
-  }
 
   ItemType? currentFilter;
 
   void filterBy(ItemType? type) {
     currentFilter = type;
-    onUpdate();
+    onItemsChanged?.call();
   }
 
   void setFontSize(int sizeIndex) {
     settingsBox.put('fontSize', sizeIndex);
-    onUpdate();
+    onItemsChanged?.call();
   }
 }

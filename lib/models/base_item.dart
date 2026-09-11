@@ -25,22 +25,40 @@ enum ItemType {
 class BaseItem {
   @HiveField(0)
   final String id;
+
   @HiveField(1)
   final ItemType type;
+
   @HiveField(2)
   final DateTime createdAt;
+
+  // 🔥 нови полета за offline-first
+  @HiveField(3)
+  DateTime updatedAt;
+
+  @HiveField(4)
+  bool isDeleted;
+
+  @HiveField(5)
+  bool isSynced;
 
   BaseItem({
     required this.id,
     required this.type,
     required this.createdAt,
-  });
+    DateTime? updatedAt,
+    this.isDeleted = false,
+    this.isSynced = true,
+  }) : updatedAt = updatedAt ?? createdAt;
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'type': type.name,
       'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+      'is_deleted': isDeleted,
+      'is_synced': isSynced,
       'data': toDataJson(),
     };
   }

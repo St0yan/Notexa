@@ -6,6 +6,7 @@ import '../models/task_item.dart';
 import '../models/idea_item.dart';
 import '../models/reminder_item.dart';
 import '../models/goal_item.dart';
+import '../models/deleted_item_marker.dart';
 
 class SupabaseService {
   final supabase = Supabase.instance.client;
@@ -45,61 +46,100 @@ class SupabaseService {
   }
 
   BaseItem decodeItem(Map<dynamic, dynamic> json) {
-    final type = ItemType.values.firstWhere((t) => t.name == json['type']);
-    final id = json['id'] ?? "";
-    final createdAt = DateTime.tryParse(json['created_at'] ?? "") ?? DateTime.now();
+    // --- ID ---
+    final id = json['id']?.toString() ?? "";
 
-    Map<String, dynamic> normalize(Map<dynamic, dynamic> input) {
-      return input.map((key, value) {
-        if (value is Map) {
-          return MapEntry(key.toString(), normalize(value));
-        }
-        return MapEntry(key.toString(), value);
-      });
+    // --- TYPE (safe) ---
+    final rawType = json['type']?.toString() ?? "";
+    ItemType? type;
+
+    try {
+      type = ItemType.values.firstWhere((t) => t.name == rawType);
+    } catch (_) {
+      // Ако типът е "deleted" или невалиден → връщаме DeletedItemMarker
+      return DeletedItemMarker(id);
     }
 
+    // --- CREATED AT (safe) ---
+    DateTime createdAt;
+    try {
+      createdAt = DateTime.parse(json['created_at'].toString());
+    } catch (_) {
+      createdAt = DateTime.now();
+    }
+
+    // --- DATA (safe) ---
     Map<String, dynamic> data = {};
 
-    if (json['data'] != null) {
-      if (json['data'] is String) {
-        data = decodeData(json['data']);   // <-- поправено
-      } else if (json['data'] is Map<String, dynamic>) {
-        data = Map<String, dynamic>.from(json['data']);
+    try {
+      final rawData = json['data'];
+
+      if (rawData == null) {
+        data = {};
+      } else if (rawData is Map) {
+        data = Map<String, dynamic>.from(rawData);
+      } else if (rawData is String) {
+        data = decodeData(rawData);
+      } else {
+        data = {};
       }
-    } else {
-      data = normalize(json);
+    } catch (_) {
+      data = {};
     }
 
-    switch (type) {
-      case ItemType.note:
-        return NoteItem(
-          id: id,
-          createdAt: createdAt,
-          title: data['title'] ?? "",
-          text: data['text'] ?? "",
-        );
-
-      case ItemType.task:
+    // --- ENTRIES (safe) ---
+    List<Map<String, dynamic>> safeEntries = [];
+    if (data['entries'] != null) {
+      try {
         dynamic rawEntries = data['entries'];
 
         if (rawEntries is String) {
           rawEntries = jsonDecode(rawEntries);
         }
-        rawEntries ??= [];
 
-        final entriesJson = rawEntries as List? ?? [];
+        if (rawEntries is List) {
+          safeEntries = rawEntries.map((e) {
+            if (e is Map) {
+              return Map<String, dynamic>.from(e);
+            }
+            return <String, dynamic>{};
+          }).toList();
+        }
+      } catch (_) {
+        safeEntries = [];
+      }
+    }
 
-        final entries = entriesJson.map((e) {
+    // --- ALARM TIME (safe) ---
+    DateTime alarmTime = DateTime.now();
+    if (data['alarm_time'] != null) {
+      try {
+        alarmTime = DateTime.parse(data['alarm_time'].toString());
+      } catch (_) {}
+    }
+
+    // --- SWITCH ---
+    switch (type) {
+      case ItemType.note:
+        return NoteItem(
+          id: id,
+          createdAt: createdAt,
+          title: data['title']?.toString() ?? "",
+          text: data['text']?.toString() ?? "",
+        );
+
+      case ItemType.task:
+        final entries = safeEntries.map((e) {
           return TaskEntry(
-            text: e['text'] ?? "",
-            isDone: e['isDone'] ?? false,
+            text: e['text']?.toString() ?? "",
+            isDone: e['isDone'] == true,
           );
         }).toList();
 
         return TaskItem(
           id: id,
           createdAt: createdAt,
-          title: data['title'] ?? "",
+          title: data['title']?.toString() ?? "",
           entries: entries,
         );
 
@@ -107,23 +147,23 @@ class SupabaseService {
         return IdeaItem(
           id: id,
           createdAt: createdAt,
-          text: data['text'] ?? "",
+          text: data['text']?.toString() ?? "",
         );
 
       case ItemType.reminder:
         return ReminderItem(
           id: id,
           createdAt: createdAt,
-          text: data['text'] ?? "",
-          alarmTime: DateTime.tryParse(data['alarm_time'] ?? "") ?? DateTime.now(),
+          text: data['text']?.toString() ?? "",
+          alarmTime: alarmTime,
         );
 
       case ItemType.goal:
         return GoalItem(
           id: id,
           createdAt: createdAt,
-          title: data['title'] ?? "",
-          text: data['text'] ?? "",
+          title: data['title']?.toString() ?? "",
+          text: data['text']?.toString() ?? "",
         );
     }
   }
@@ -147,6 +187,19 @@ class SupabaseService {
       await supabase.from('items').insert(item.toJson());
     } else {
       await supabase.from('items').update(item.toJson()).eq('id', item.id);
+    }
+  }
+
+  Future<bool> exists(String id) async {
+    try {
+      final result = await Supabase.instance.client
+          .from('items')
+          .select()
+          .eq('id', id);
+
+      return result.isNotEmpty;
+    } catch (_) {
+      return false;
     }
   }
 }

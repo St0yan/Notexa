@@ -3,6 +3,11 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '/pages/home_page.dart';
 import '/models/base_item.dart';
+import '/models/note_item.dart';
+import '/models/task_item.dart';
+import '/models/idea_item.dart';
+import '/models/reminder_item.dart';
+import '/models/goal_item.dart';
 import '/models/deleted_item_marker.dart';
 import '/services/notification_service.dart';
 import '/pages/home_controller.dart';
@@ -14,29 +19,41 @@ void main() async {
   await Hive.initFlutter();
 
   Hive.registerAdapter(ItemTypeAdapter());
+  Hive.registerAdapter(BaseItemAdapter());
+  Hive.registerAdapter(NoteItemAdapter());
+  Hive.registerAdapter(TaskItemAdapter());
+  Hive.registerAdapter(IdeaItemAdapter());
+  Hive.registerAdapter(ReminderItemAdapter());
+  Hive.registerAdapter(GoalItemAdapter());
   Hive.registerAdapter(DeletedItemMarkerAdapter());
 
   //await Hive.deleteBoxFromDisk('items');
-  await Hive.openBox<String>('items');
+  //await Hive.openBox<String>('items');
 
-  await Supabase.initialize(
+  try {
+    await Supabase.initialize(
       url: 'https://sbugqqhhfjzrbjmjtczc.supabase.co',
-      publishableKey: 'sb_publishable_Yye4EaY186Tzm2ju4UDWLg_0Ytt0Jdf',
+      anonKey: 'sb_publishable_Yye4EaY186Tzm2ju4UDWLg_0Ytt0Jdf',
     );
-  await Supabase.instance.client.auth.signInWithPassword(
-        email: "test@notexa.app",
-        password: "12345678",
-      );
 
-  final controller = HomeController(onUpdate: () {});
+    await Supabase.instance.client.auth.signInWithPassword(
+      email: "test@notexa.app",
+      password: "12345678",
+    );
+  } catch (_) {
+    // офлайн → продължаваме
+  }
+
+  final controller = HomeController();
   await controller.init();
-  HomeController.instance = controller;
 
-  runApp(const Notexa());
+  runApp(Notexa(controller));
 }
 
 class Notexa extends StatefulWidget {
-  const Notexa({super.key});
+  final HomeController controller;
+
+  const Notexa(this.controller, {super.key});
 
   @override
   State<Notexa> createState() => _NotexaState();
@@ -47,7 +64,7 @@ class _NotexaState extends State<Notexa> {
   void initState() {
     super.initState();
 
-    HomeController.instance.onThemeChanged = () {
+    widget.controller.onThemeChanged = () {
       setState(() {});
     };
   }
@@ -56,8 +73,8 @@ class _NotexaState extends State<Notexa> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: const HomePage(),
-      themeMode: HomeController.instance.currentTheme,
+      home: HomePage(controller: widget.controller),
+      themeMode: widget.controller.currentTheme,
       theme: lightTheme,
       darkTheme: darkTheme,
     );
@@ -72,9 +89,7 @@ class _NotexaState extends State<Notexa> {
       primary: Colors.tealAccent.shade200,
       secondary: Colors.tealAccent.shade100,
       surface: Colors.black,
-      background: Colors.black,
       onSurface: Colors.white,
-      onBackground: Colors.white,
     ),
 
     scaffoldBackgroundColor: Colors.black,
@@ -117,9 +132,7 @@ class _NotexaState extends State<Notexa> {
       primary: Colors.blueGrey.shade700,
       secondary: Colors.teal.shade600,
       surface: Colors.white,
-      background: Colors.grey.shade100,
       onSurface: Colors.black,
-      onBackground: Colors.black,
     ),
 
     scaffoldBackgroundColor: Colors.grey.shade100,

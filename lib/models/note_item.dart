@@ -5,6 +5,7 @@ part 'note_item.g.dart';
 
 @HiveType(typeId: 1)
 class NoteItem extends BaseItem {
+  @override
   @HiveField(3)
   final String title;
   @HiveField(4)
