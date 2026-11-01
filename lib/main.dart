@@ -11,6 +11,7 @@ import '/models/goal_item.dart';
 import '/models/deleted_item_marker.dart';
 import '/services/notification_service.dart';
 import '/pages/home_controller.dart';
+import '/pages/lock_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,10 +60,16 @@ class Notexa extends StatefulWidget {
   State<Notexa> createState() => _NotexaState();
 }
 
-class _NotexaState extends State<Notexa> {
+class _NotexaState extends State<Notexa>
+    with WidgetsBindingObserver {
+
+  bool _locked = true;
+
   @override
   void initState() {
     super.initState();
+
+    WidgetsBinding.instance.addObserver(this);
 
     widget.controller.onThemeChanged = () {
       setState(() {});
@@ -70,13 +77,45 @@ class _NotexaState extends State<Notexa> {
   }
 
   @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      setState(() {
+        _locked = true;
+      });
+    }
+  }
+
+  void _unlockApp() {
+    if (!mounted) return;
+
+    setState(() {
+      _locked = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: HomePage(controller: widget.controller),
       themeMode: widget.controller.currentTheme,
       theme: lightTheme,
       darkTheme: darkTheme,
+
+      home: _locked
+          ? LockScreen(
+              controller: widget.controller,
+              onUnlocked: _unlockApp,
+            )
+          : HomePage(
+              controller: widget.controller,
+            ),
     );
   }
 
