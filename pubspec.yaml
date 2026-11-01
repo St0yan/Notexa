@@ -19,6 +19,7 @@ dependencies:
   linkify: ^5.0.0
   flutter_launcher_icons: ^0.14.4
   connectivity_plus: ^7.3.1
+  local_auth: ^3.0.2
 
 dev_dependencies:
   flutter_test:

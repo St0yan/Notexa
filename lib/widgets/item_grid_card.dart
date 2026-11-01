@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import '../models/base_item.dart';
 import '../models/task_item.dart';
 import 'item_type_helpers.dart';
+import '../pages/home_controller.dart';
+import 'dart:convert';
+import 'package:hive/hive.dart';
 
 class ItemGridCard extends StatelessWidget {
   final BaseItem item;
@@ -26,7 +29,16 @@ class ItemGridCard extends StatelessWidget {
     final isTask = item.type == ItemType.task;
     final task = isTask ? item as TaskItem : null;
     return InkWell(
-      onTap: onTap,
+      onTap: () async {
+        if (item.isLocked) {
+          final unlocked = await HomeController.instance.authenticateUser();
+          if (!unlocked) return;
+
+          onTap();
+          return;
+        }
+        onTap();
+      },
       onLongPress: () {
         HapticFeedback.mediumImpact();
 
@@ -53,8 +65,16 @@ class ItemGridCard extends StatelessWidget {
                   left: pos.dx + box.size.width - 160,
                   top: pos.dy - 10,
                   child: _BubbleMenu(
+                    item: item,
                     onEdit: onEdit,
                     onDelete: onDelete,
+                    onLockToggle: (updatedItem) async {
+                      final box = Hive.box<String>('items');
+                      box.put(updatedItem.id, jsonEncode(updatedItem.toJson()));
+
+                      await HomeController.instance.supabaseService.uploadOrUpdateItem(updatedItem);
+                      HomeController.instance.onItemsChanged?.call();
+                    },
                   ),
                 ),
               ],
@@ -80,72 +100,98 @@ class ItemGridCard extends StatelessWidget {
           color: getColorForType(item.type),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              getIconForType(item.type),
-              size: 22,
-              color: Colors.black87,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              getTitleForItem(item),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: fontSize,
-                fontWeight: FontWeight.w600,
-                color: const Color.fromARGB(255, 219, 4, 4)
-              ),
-            ),
-            const SizedBox(height: 6),
-            if (isTask) ...[
-              const SizedBox(height: 6),
-
-              for (int i = 0; i < task!.entries.length; i++)
-                Row(
+        child: item.isLocked
+            ? Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      task.entries[i].isDone
-                          ? Icons.check_box
-                          : Icons.check_box_outline_blank,
-                      size: 18,
-                      color: task.entries[i].isDone
-                          ? Colors.green
-                          : Colors.black54,
+                      Icons.lock,
+                      size: 48,
+                      color: Colors.black.withOpacity(0.75),
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        task.entries[i].text,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          decoration: task.entries[i].isDone
-                              ? TextDecoration.lineThrough
-                              : null,
-                          color: task.entries[i].isDone
-                              ? Colors.black54
-                              : Colors.black87,
-                        ),
+                    const SizedBox(height: 8),
+                    Text(
+                      getTitleForItem(item).isNotEmpty
+                          ? getTitleForItem(item)
+                          : "Заключено",
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
                       ),
                     ),
                   ],
                 ),
-            ]
-            else
-              Text(
-                getPreviewText(item),
-                maxLines: 6,
-                overflow: TextOverflow.fade,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Colors.black87,
-                ),
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    getIconForType(item.type),
+                    size: 22,
+                    color: Colors.black87,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    getTitleForItem(item),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: fontSize,
+                      fontWeight: FontWeight.w600,
+                      color: const Color.fromARGB(255, 219, 4, 4),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+
+                  if (isTask) ...[
+                    const SizedBox(height: 6),
+                    for (int i = 0; i < task!.entries.length; i++)
+                      Row(
+                        children: [
+                          Icon(
+                            task.entries[i].isDone
+                                ? Icons.check_box
+                                : Icons.check_box_outline_blank,
+                            size: 18,
+                            color: task.entries[i].isDone
+                                ? Colors.green
+                                : Colors.black54,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              task.entries[i].text,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                decoration: task.entries[i].isDone
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                                color: task.entries[i].isDone
+                                    ? Colors.black54
+                                    : Colors.black87,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                  ]
+                  else
+                    Text(
+                      getPreviewText(item),
+                      maxLines: 6,
+                      overflow: TextOverflow.fade,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.black87,
+                      ),
+                    ),
+                ],
               ),
-          ],
-        ),
       ),
     );
   }
@@ -154,10 +200,14 @@ class ItemGridCard extends StatelessWidget {
 class _BubbleMenu extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final BaseItem item;
+  final Function(BaseItem updatedItem) onLockToggle;
 
   const _BubbleMenu({
     required this.onEdit,
     required this.onDelete,
+    required this.item,
+    required this.onLockToggle,
   });
 
   @override
@@ -172,6 +222,28 @@ class _BubbleMenu extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (!item.isLocked)
+              _BubbleItem(
+                icon: Icons.lock,
+                color: Colors.orange,
+                text: "Заключи",
+                onTap: () {
+                  Navigator.pop(context);
+                  item.isLocked = true;
+                  onLockToggle(item);
+                },
+              ),
+            if (item.isLocked)
+              _BubbleItem(
+                icon: Icons.lock_open,
+                color: Colors.green,
+                text: "Отключи",
+                onTap: () {
+                  Navigator.pop(context);
+                  item.isLocked = false;
+                  onLockToggle(item);
+                },
+              ),
             _BubbleItem(
               icon: Icons.edit,
               color: Colors.blue,

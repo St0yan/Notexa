@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:timezone/timezone.dart';
 import 'dart:io';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
@@ -19,6 +18,7 @@ import 'add_note_page.dart';
 import 'add_reminder_page.dart';
 import 'add_task_page.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:local_auth/local_auth.dart';
 
 enum SortMode {
   dateAsc,
@@ -41,6 +41,8 @@ class HomeController {
   late Box<String> box;
   late Box settingsBox;
   late Box<String> offlineBox;
+
+  final LocalAuthentication _auth = LocalAuthentication();
 
   VoidCallback? onItemsChanged;
   late VoidCallback onThemeChanged;
@@ -301,9 +303,13 @@ class HomeController {
   }
 
   Future<void> uploadItem(BaseItem item) async {
-    await Supabase.instance.client
+    try {
+      await Supabase.instance.client
         .from('items')
         .insert(item.toJson());
+    } catch (e) {
+      print("Supabase upload error: $e");
+    }
   }
 
   void deleteItem(BaseItem item) async {
@@ -330,7 +336,7 @@ class HomeController {
     }
   }
 
-  void openItem(BuildContext context, BaseItem item) {
+  void openItem(BuildContext context, BaseItem item) async {
     if (item is DeletedItemMarker) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -611,4 +617,19 @@ class HomeController {
     settingsBox.put('fontSize', sizeIndex);
     onItemsChanged?.call();
   }
+
+  Future<bool> authenticateUser() async {
+  try {
+    final didAuthenticate = await _auth.authenticate(
+      localizedReason:
+          'Моля, потвърдете самоличността си, за да отворите този елемент.',
+      biometricOnly: true,
+      persistAcrossBackgrounding: false,
+    );
+    return didAuthenticate;
+  } catch (e) {
+    print('❌ AUTH ERROR: $e');
+    return false;
+  }
+}
 }

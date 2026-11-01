@@ -42,6 +42,9 @@ class BaseItem {
   @HiveField(5)
   bool isSynced;
 
+  @HiveField(6)
+  bool isLocked;
+
   BaseItem({
     required this.id,
     required this.type,
@@ -49,6 +52,7 @@ class BaseItem {
     DateTime? updatedAt,
     this.isDeleted = false,
     this.isSynced = true,
+    this.isLocked = false,
   }) : updatedAt = updatedAt ?? createdAt;
 
   Map<String, dynamic> toJson() {
@@ -59,6 +63,7 @@ class BaseItem {
       'updated_at': updatedAt.toIso8601String(),
       'is_deleted': isDeleted,
       'is_synced': isSynced,
+      'is_locked': isLocked,
       'data': toDataJson(),
     };
   }
