@@ -64,12 +64,9 @@ class NotificationService {
             sound: RawResourceAndroidNotificationSound('notify_notexa'),
             icon: 'notify_icon',
             actions: <AndroidNotificationAction>[
-              AndroidNotificationAction('snooze_15m', 'Отлагане 15 мин', showsUserInterface: true),
-              AndroidNotificationAction('snooze_30m', 'Отлагане 30 мин', showsUserInterface: true),
               AndroidNotificationAction('snooze_1h', 'Отлагане 1 час', showsUserInterface: true),
-              AndroidNotificationAction('snooze_2h', 'Отлагане 2 часа', showsUserInterface: true),
               AndroidNotificationAction('snooze_tomorrow', 'До утре сутрин', showsUserInterface: true),
-              AndroidNotificationAction('snooze_monday', 'До понеделник', showsUserInterface: true),
+              //AndroidNotificationAction('snooze_monday', 'До понеделник', showsUserInterface: true),
               AndroidNotificationAction('mark_done', 'Изпълнено', showsUserInterface: true),
             ],
           ),
@@ -88,14 +85,8 @@ class NotificationService {
     final actionId = response.actionId;
     final itemId = response.payload;
 
-    if (actionId == 'snooze_15m') {
-      _handleSnooze(itemId, const Duration(minutes: 15));
-    } else if (actionId == 'snooze_30m') {
-      _handleSnooze(itemId, const Duration(minutes: 30));
-    } else if (actionId == 'snooze_1h') {
+    if (actionId == 'snooze_1h') {
       _handleSnooze(itemId, const Duration(hours: 1));
-    } else if (actionId == 'snooze_2h') {
-      _handleSnooze(itemId, const Duration(hours: 2));
     } else if (actionId == 'snooze_tomorrow') {
       _handleSnoozeTomorrow(itemId);
     } else if (actionId == 'snooze_monday') {

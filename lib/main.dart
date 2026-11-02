@@ -64,6 +64,7 @@ class _NotexaState extends State<Notexa>
     with WidgetsBindingObserver {
 
   bool _locked = true;
+  DateTime? _backgroundTime;
 
   @override
   void initState() {
@@ -86,10 +87,33 @@ class _NotexaState extends State<Notexa>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
+
+      _backgroundTime = DateTime.now();
+    }
+
+    if (state == AppLifecycleState.resumed &&
+      widget.controller.lockEnabled) {
+
+    if (_backgroundTime == null) return;
+
+    final elapsedSeconds =
+        DateTime.now()
+            .difference(_backgroundTime!)
+            .inSeconds;
+
+    final timeout =
+        widget.controller.lockTimeoutSeconds;
+
+    if (timeout == 0) {
+      setState(() {
+        _locked = true;
+      });
+    } else if (elapsedSeconds >= timeout) {
       setState(() {
         _locked = true;
       });
     }
+  }
   }
 
   void _unlockApp() {
@@ -108,14 +132,18 @@ class _NotexaState extends State<Notexa>
       theme: lightTheme,
       darkTheme: darkTheme,
 
-      home: _locked
-          ? LockScreen(
-              controller: widget.controller,
-              onUnlocked: _unlockApp,
-            )
-          : HomePage(
-              controller: widget.controller,
-            ),
+      home: widget.controller.lockEnabled
+        ? (_locked
+            ? LockScreen(
+                controller: widget.controller,
+                onUnlocked: _unlockApp,
+              )
+            : HomePage(
+                controller: widget.controller,
+              ))
+        : HomePage(
+            controller: widget.controller,
+          ),
     );
   }
 

@@ -5,6 +5,7 @@ import '../services/permission_dialogs.dart';
 import '../models/base_item.dart';
 import '../widgets/item_grid_card.dart';
 import 'menu_controller.dart';
+import 'settings_page.dart';
 
 class HomePage extends StatefulWidget {
   final HomeController controller;
@@ -162,8 +163,17 @@ class _HomePageState extends State<HomePage> {
         actions: [
           IconButton(
             key: menuButtonKey,
-            icon: const Icon(Icons.menu),
-            onPressed: () => showMainMenu(context, menuButtonKey),
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => SettingsPage(
+                    controller: controller,
+                  ),
+                ),
+              );
+            },
           ),
           widget.controller.isSyncing
               ? const Padding(

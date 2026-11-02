@@ -37,6 +37,9 @@ class HomeController {
   final List<BaseItem> items = [];
 
   bool isSyncing = false;
+  bool lockEnabled = true;
+
+  int lockTimeoutSeconds = 60;
 
   late Box<String> box;
   late Box settingsBox;
@@ -58,6 +61,12 @@ class HomeController {
     box = await Hive.openBox<String>('items');
     settingsBox = await Hive.openBox('settings');
     offlineBox = await Hive.openBox<String>('offline_queue');
+    lockEnabled = settingsBox.get('lockEnabled', defaultValue: true);
+    lockTimeoutSeconds =
+    settingsBox.get(
+      'lockTimeoutSeconds',
+      defaultValue: 0,
+    );
 
     final savedMode = settingsBox.get('sortMode');
     if (savedMode != null) {
@@ -619,17 +628,47 @@ class HomeController {
   }
 
   Future<bool> authenticateUser() async {
-  try {
-    final didAuthenticate = await _auth.authenticate(
-      localizedReason:
-          'Моля, потвърдете самоличността си, за да отворите този елемент.',
-      biometricOnly: true,
-      persistAcrossBackgrounding: false,
-    );
-    return didAuthenticate;
-  } catch (e) {
-    print('❌ AUTH ERROR: $e');
-    return false;
+    try {
+      final didAuthenticate = await _auth.authenticate(
+        localizedReason:
+            'Моля, потвърдете самоличността си, за да отворите този елемент.',
+        biometricOnly: true,
+        persistAcrossBackgrounding: false,
+      );
+      return didAuthenticate;
+    } catch (e) {
+      print('❌ AUTH ERROR: $e');
+      return false;
+    }
   }
-}
+
+  Future<void> setLockEnabled(bool value) async {
+    lockEnabled = value;
+
+    final settingsBox =
+        await Hive.openBox('settings');
+
+    await settingsBox.put(
+      'lockEnabled',
+      value,
+    );
+
+    onItemsChanged?.call();
+  }
+
+  Future<void> setLockTimeout(
+    int seconds,
+  ) async {
+    lockTimeoutSeconds = seconds;
+
+    final settingsBox =
+        await Hive.openBox('settings');
+
+    await settingsBox.put(
+      'lockTimeoutSeconds',
+      seconds,
+    );
+
+    onThemeChanged?.call();
+  }
 }
