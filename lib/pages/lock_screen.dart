@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'home_controller.dart';
-import 'home_page.dart';
 
 class LockScreen extends StatefulWidget {
   final HomeController controller;
@@ -62,6 +61,14 @@ class _LockScreenState extends State<LockScreen> {
               icon: const Icon(Icons.fingerprint),
               label: const Text('Отключи'),
               onPressed: _unlock,
+            ),
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.login),
+              label: const Text('Вход с Google'),
+              onPressed: () async {
+                await widget.controller.signInWithGoogle();
+              },
             ),
           ],
         ),

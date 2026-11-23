@@ -669,6 +669,13 @@ class HomeController {
       seconds,
     );
 
-    onThemeChanged?.call();
+    onThemeChanged.call();
+  }
+
+  Future<void> signInWithGoogle() async {
+    await Supabase.instance.client.auth.signInWithOAuth(
+      OAuthProvider.google,
+      redirectTo: 'notexa://login-callback',
+    );
   }
 }

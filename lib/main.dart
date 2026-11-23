@@ -37,6 +37,14 @@ void main() async {
       anonKey: 'sb_publishable_Yye4EaY186Tzm2ju4UDWLg_0Ytt0Jdf',
     );
 
+    Supabase.instance.client.auth.onAuthStateChange.listen(
+      (data) {
+         print(
+          'AUTH EVENT: ${data.event} USER: ${data.session?.user.email}',
+        );
+      }
+    );
+
     await Supabase.instance.client.auth.signInWithPassword(
       email: "test@notexa.app",
       password: "12345678",
